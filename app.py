@@ -1,20 +1,54 @@
 import pandas as pd
 import calendar
 from io import BytesIO
-from flask import Flask, render_template, request, redirect, url_for, send_file, flash
+from flask import Flask, render_template, request, redirect, url_for, send_file, flash, session
 from database import db
 from datetime import date, datetime, timedelta
 
+# Initiera appen
 app = Flask(__name__)
+
+# INSTÄLLNINGAR
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///ambulans.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.secret_key = 'hemlig'
+app.secret_key = 'hemlig' # Detta krävs för att sessioner (inloggning) ska funka
+
+# LÖSENORD FÖR ATT KOMMA IN
+SYSTEM_PASSWORD = "ambulans112"
 
 db.init_app(app)
 
 from models import *
 
-# --- HUVUDSIDAN ---
+# -------------------------------------------------------------------
+#  SÄKERHET: KONTROLLERA INLOGGNING PÅ ALLA SIDOR
+# -------------------------------------------------------------------
+@app.before_request
+def require_login():
+    # Tillåt trafik till inloggningssidan och statiska filer (css/js)
+    allowed_routes = ['login', 'static']
+    if request.endpoint not in allowed_routes and 'logged_in' not in session:
+        return redirect(url_for('login'))
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        password = request.form.get('password')
+        if password == SYSTEM_PASSWORD:
+            session['logged_in'] = True
+            return redirect(url_for('index'))
+        else:
+            flash("Fel lösenord. Försök igen.")
+    return render_template('login.html')
+
+@app.route('/logout')
+def logout():
+    session.pop('logged_in', None)
+    return redirect(url_for('login'))
+
+# -------------------------------------------------------------------
+#  HUVUDSIDAN (PLANERING)
+# -------------------------------------------------------------------
 @app.route('/')
 def index():
     selected_date_str = request.args.get('date')
@@ -49,41 +83,26 @@ def index():
             if shift.vub_id not in busy_users: busy_users[shift.vub_id] = {}
             busy_users[shift.vub_id][shift.period] = shift.unit.name
 
-    # --- NYTT: Hitta alla vakanta bilar idag (för Flytt-listan) ---
+    # Hitta vakanta bilar för flytt-listan
     vacant_spots = []
-    # Vi loopar igenom alla bilar och kollar om de saknar folk i shift_map
     all_units = Unit.query.all()
     for unit in all_units:
-        # Hoppa över blankpass-stationen i vakanslistan (man flyttar TILL bil)
         if 'BLANKPASS' in unit.station.name: continue
-
-        # Kolla Dag
         s_dag = shift_map.get(unit.id, {}).get('Dag')
         if not s_dag or not s_dag.amb_id or not s_dag.vub_id:
             vacant_spots.append({'id': unit.id, 'name': unit.name, 'period': 'Dag', 'station': unit.station.name})
-        
-        # Kolla Natt
         s_natt = shift_map.get(unit.id, {}).get('Natt')
         if not s_natt or not s_natt.amb_id or not s_natt.vub_id:
             vacant_spots.append({'id': unit.id, 'name': unit.name, 'period': 'Natt', 'station': unit.station.name})
-
-        # Kolla Mellan
         if unit.mid_time:
             s_mid = shift_map.get(unit.id, {}).get('Mellan')
             if not s_mid or not s_mid.amb_id or not s_mid.vub_id:
                 vacant_spots.append({'id': unit.id, 'name': unit.name, 'period': 'Mellan', 'station': unit.station.name})
 
     return render_template('index.html', 
-                           stations=all_stations, 
-                           shift_map=shift_map, 
-                           users=all_users, 
-                           busy_users=busy_users, 
-                           current_date=selected_date_str, 
-                           prev_date=prev_date, 
-                           next_date=next_date,
-                           vacant_spots=vacant_spots) # Skicka med listan
+                           stations=all_stations, shift_map=shift_map, users=all_users, busy_users=busy_users, 
+                           current_date=selected_date_str, prev_date=prev_date, next_date=next_date, vacant_spots=vacant_spots)
 
-# --- SPARA PASS ---
 @app.route('/update_shift', methods=['POST'])
 def update_shift():
     target_date = request.form.get('date') 
@@ -92,11 +111,9 @@ def update_shift():
     new_amb_id = int(request.form.get('amb_id')) if request.form.get('amb_id') else None
     new_vub_id = int(request.form.get('vub_id')) if request.form.get('vub_id') else None
 
-    # Hämta enheten för att veta vilken station vi ska scrolla till
     unit = Unit.query.get(unit_id)
     station_anchor = f"station-{unit.station.id}" if unit else ""
 
-    # Rensning av dubbelbokning (Blankpass)
     def clear_from_blankpass(user_id):
         if not user_id: return
         user_shifts = Shift.query.filter_by(date=target_date, period=period).all()
@@ -117,53 +134,39 @@ def update_shift():
     shift.vub_id = new_vub_id
     db.session.commit()
     
-    # Notera _anchor i redirecten -> Fixar scrollen!
     return redirect(url_for('index', date=target_date, _anchor=station_anchor))
 
-# --- NY ROUTE: FLYTTA FRÅN BLANKPASS ---
 @app.route('/move_staff', methods=['POST'])
 def move_staff():
     date_str = request.form.get('date')
     person_id = int(request.form.get('person_id'))
-    
-    # Här får vi strängen "unitID|period", t.ex. "5|Dag"
     target_value = request.form.get('target_spot') 
-    if not target_value:
-        return redirect(url_for('index', date=date_str))
+    if not target_value: return redirect(url_for('index', date=date_str))
 
     target_unit_id, target_period = target_value.split('|')
     target_unit_id = int(target_unit_id)
 
-    # 1. Hitta och rensa gamla passet (Blankpasset)
     old_shifts = Shift.query.filter_by(date=date_str).all()
     for s in old_shifts:
         if s.amb_id == person_id: s.amb_id = None
         if s.vub_id == person_id: s.vub_id = None
     
-    # 2. Hitta/Skapa nya passet (Bilen)
     shift = Shift.query.filter_by(date=date_str, unit_id=target_unit_id, period=target_period).first()
     if not shift:
         shift = Shift(date=date_str, unit_id=target_unit_id, period=target_period)
         db.session.add(shift)
     
-    # 3. Placera personen i första lediga lucka (AMB först, sen VUB)
-    if not shift.amb_id:
-        shift.amb_id = person_id
-    elif not shift.vub_id:
-        shift.vub_id = person_id
-    else:
-        # Fullt? (Borde inte hända om listan var korrekt, men som säkerhet)
-        flash("Bilen var tyvärr full.", "warning")
+    if not shift.amb_id: shift.amb_id = person_id
+    elif not shift.vub_id: shift.vub_id = person_id
+    else: flash("Bilen var tyvärr full.", "warning")
 
     db.session.commit()
-    
-    # Hämta station för scroll
     unit = Unit.query.get(target_unit_id)
     return redirect(url_for('index', date=date_str, _anchor=f"station-{unit.station.id}"))
 
-# ... (RESTEN AV ADMIN-ROUTERNA ÄR SAMMA SOM FÖRUT) ...
-# (Kopiera in Admin, Dashboard, Export etc. från förra koden om du byter hela filen)
-# För enkelhets skull, här är resten komprimerat:
+# -------------------------------------------------------------------
+#  DASHBOARD & ADMIN (SAMMA SOM FÖRUT)
+# -------------------------------------------------------------------
 @app.route('/dashboard')
 def dashboard():
     users = User.query.order_by(User.home_station, User.name).all()
