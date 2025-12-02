@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+    <meta charset="UTF-8">
+    <title>Teknisk Admin</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .form-control-sm { font-size: 0.85rem; }
+        .unit-row { background-color: #fff; border-bottom: 1px solid #eee; padding: 10px 5px; }
+        .unit-row:hover { background-color: #f8f9fa; }
+    </style>
+</head>
+<body class="bg-light">
+
+<nav class="navbar navbar-dark bg-dark mb-4">
+    <div class="container">
+        <span class="navbar-brand mb-0 h1">🔧 Teknisk Admin</span>
+        <a href="/" class="btn btn-outline-light btn-sm">Tillbaka till Planering</a>
+    </div>
+</nav>
+
+<div class="container mt-3">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+</div>
+
+<div class="container pb-5">
+    
+    <div class="row">
+        <div class="col-md-5">
+            
+            <div class="card shadow-sm mb-4 border-primary">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="m-0">🏢 Hantera Stationer</h5>
+                </div>
+                <div class="card-body">
+                    
+                    <form action="/admin/add_station" method="POST" class="d-flex gap-2 mb-4 border-bottom pb-3">
+                        <input type="text" name="name" class="form-control" placeholder="Nytt stationsnamn..." required>
+                        <button type="submit" class="btn btn-success">Lägg till</button>
+                    </form>
+
+                    <h6 class="text-muted small fw-bold">Redigera befintliga namn</h6>
+                    <div style="max-height: 300px; overflow-y: auto;">
+                        {% for station in stations %}
+                        <form action="/admin/update_station" method="POST" class="d-flex gap-2 mb-2">
+                            <input type="hidden" name="station_id" value="{{ station.id }}">
+                            <input type="text" name="name" class="form-control form-control-sm" value="{{ station.name }}">
+                            <button type="submit" class="btn btn-outline-primary btn-sm">Spara</button>
+                        </form>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="card shadow-sm mb-4 border-warning">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="m-0">💾 Backup & Återställning</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3 pb-3 border-bottom">
+                        <h6>1. Spara säkerhetskopia</h6>
+                        <a href="/admin/export_excel" class="btn btn-outline-dark w-100">⬇️ Ladda ner Excel</a>
+                    </div>
+                    <div>
+                        <h6>2. Läs in från Excel</h6>
+                        <form action="/admin/import_excel" method="POST" enctype="multipart/form-data">
+                            <input type="file" name="file" class="form-control mb-2" accept=".xlsx" required>
+                            <button type="submit" class="btn btn-danger w-100">Läs in (Skriver över)</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card shadow-sm mb-4 border-info">
+                <div class="card-header bg-info text-white">
+                    <h5 class="m-0">📅 Generera Månadsmall</h5>
+                </div>
+                <div class="card-body">
+                    <form action="/admin/generate_template" method="POST">
+                        <div class="row g-2">
+                            <div class="col-6">
+                                <label>År</label>
+                                <input type="number" name="year" class="form-control" value="2025" required>
+                            </div>
+                            <div class="col-6">
+                                <label>Månad</label>
+                                <select name="month" class="form-select">
+                                    <option value="12" selected>December</option>
+                                    <option value="1">Januari</option>
+                                    <option value="2">Februari</option>
+                                    <option value="3">Mars</option>
+                                    <option value="4">April</option>
+                                    <option value="5">Maj</option>
+                                    <option value="6">Juni</option>
+                                    <option value="7">Juli</option>
+                                    <option value="8">Augusti</option>
+                                    <option value="9">September</option>
+                                    <option value="10">Oktober</option>
+                                    <option value="11">November</option>
+                                </select>
+                            </div>
+                            <div class="col-12 mt-2">
+                                <button type="submit" class="btn btn-info text-white w-100">Skapa tom Excel-fil</button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+        </div>
+
+        <div class="col-md-7">
+            <div class="card shadow-sm">
+                <div class="card-header bg-secondary text-white">
+                    <h5 class="m-0">🚑 Konfigurera Enheter</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div style="max-height: 800px; overflow-y: auto;">
+                        {% for station in stations %}
+                            <div class="p-2 bg-dark text-white d-flex justify-content-between align-items-center mt-0">
+                                <strong class="ms-2">{{ station.name }}</strong>
+                            </div>
+                            <div class="container-fluid py-2">
+                                <div class="row g-1 mb-1 text-muted small fw-bold text-center">
+                                    <div class="col-3">Bilnamn</div>
+                                    <div class="col-2">Dag</div>
+                                    <div class="col-2">Mellan</div>
+                                    <div class="col-2">Natt</div>
+                                    <div class="col-1">SITS</div>
+                                    <div class="col-1">Flex</div>
+                                    <div class="col-1"></div>
+                                </div>
+                                {% for unit in station.units %}
+                                <form action="/admin/update_unit" method="POST" class="row g-1 align-items-center unit-row">
+                                    <input type="hidden" name="unit_id" value="{{ unit.id }}">
+                                    <div class="col-3"><input type="text" name="name" class="form-control form-control-sm fw-bold" value="{{ unit.name }}"></div>
+                                    <div class="col-2"><input type="text" name="day_time" class="form-control form-control-sm" value="{{ unit.day_time }}"></div>
+                                    <div class="col-2"><input type="text" name="mid_time" class="form-control form-control-sm" value="{{ unit.mid_time }}"></div>
+                                    <div class="col-2"><input type="text" name="night_time" class="form-control form-control-sm" value="{{ unit.night_time }}"></div>
+                                    <div class="col-1 text-center"><input class="form-check-input" type="checkbox" name="requires_sits" {% if unit.requires_sits %}checked{% endif %}></div>
+                                    <div class="col-1 text-center"><input class="form-check-input" type="checkbox" name="is_flex" {% if unit.is_flex %}checked{% endif %}></div>
+                                    <div class="col-1 text-end"><button type="submit" class="btn btn-primary btn-sm px-2">💾</button></div>
+                                </form>
+                                {% endfor %}
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+</body>
+</html>

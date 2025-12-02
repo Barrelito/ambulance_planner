@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+    <meta charset="UTF-8">
+    <title>Ambulansplanering</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .unit-row { border-bottom: 1px solid #eee; padding: 10px 0; }
+        .sits-badge { background-color: #ffc107; color: #000; font-weight: bold; font-size: 0.8em; padding: 2px 6px; border-radius: 4px; }
+        .shift-box { background-color: #f8f9fa; border: 1px dashed #ccc; padding: 8px; text-align: center; border-radius: 5px; cursor: pointer; transition: 0.2s; min-height: 50px; position: relative;}
+        .shift-box:hover { background-color: #e2e6ea; border-color: #adb5bd; }
+        .blankpass-box { background-color: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 10px; cursor: pointer; transition: 0.2s; text-align: center; height: 100%; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+        .blankpass-box:hover { background-color: #f3e5f5; border-color: #6f42c1; transform: translateY(-2px); }
+        .blankpass-active { background-color: #e1bee7; border-color: #8e24aa; }
+        .shift-warning { background-color: #fff3cd !important; border: 2px solid #ffc107 !important; }
+        .station-header { cursor: pointer; transition: background-color 0.2s; }
+        .station-header:hover { opacity: 0.9; }
+        .bg-purple { background-color: #6f42c1 !important; }
+        .status-dot { height: 15px; width: 15px; border-radius: 50%; display: inline-block; border: 2px solid white; }
+        .dot-green { background-color: #28a745; }
+        .dot-red { background-color: #dc3545; }
+        .time-label { font-size: 0.7em; color: #6c757d; display: block; margin-bottom: 4px; border-bottom: 1px solid #e9ecef; }
+        .shift-disabled { background-color: #e9ecef; border: 1px solid #dee2e6; cursor: default; opacity: 0.6; }
+    </style>
+</head>
+<body class="bg-light">
+
+<select id="vacanciesData" style="display:none;">
+    <option value="">-- Välj bil --</option>
+    {% for v in vacant_spots %}
+        <option value="{{ v.id }}|{{ v.period }}">{{ v.station }} - {{ v.name }} ({{ v.period }})</option>
+    {% endfor %}
+</select>
+
+<div class="bg-white shadow-sm sticky-top mb-4 py-3">
+    <div class="container">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h2 class="m-0 fw-bold">🚑 VO NORD <span class="text-primary ms-2">{{ current_date }}</span></h2>
+            <div class="d-flex gap-2">
+                <a href="/dashboard" class="btn btn-primary btn-sm">📊 Samordnare</a>
+                <a href="/admin" class="btn btn-secondary btn-sm">🔧 Teknisk Admin</a>
+            </div>
+        </div>
+        <form action="/" method="GET" class="d-flex justify-content-between align-items-center bg-light p-2 rounded border">
+            <a href="/?date={{ prev_date }}" class="btn btn-outline-dark fw-bold">‹ Föregående dag</a>
+            <input type="date" name="date" class="form-control w-auto" value="{{ current_date }}" onchange="this.form.submit()">
+            <a href="/?date={{ next_date }}" class="btn btn-outline-dark fw-bold">Nästa dag ›</a>
+        </form>
+    </div>
+</div>
+
+<div class="container pb-5">
+    {% for station in stations %}
+    
+    {% set status = namespace(has_vacancies=false) %}
+    {% for unit in station.units %}
+        {% set s_dag = shift_map.get(unit.id, {}).get('Dag') %}
+        {% if not s_dag or not s_dag.amb or not s_dag.vub %} {% set status.has_vacancies = true %} {% endif %}
+        {% if 'BLANKPASS' not in station.name %}
+            {% set s_natt = shift_map.get(unit.id, {}).get('Natt') %}
+            {% if not s_natt or not s_natt.amb or not s_natt.vub %} {% set status.has_vacancies = true %} {% endif %}
+        {% endif %}
+    {% endfor %}
+
+    {% set header_bg = 'bg-purple' if 'BLANKPASS' in station.name else 'bg-dark' %}
+
+    <div class="card mb-3 shadow-sm" id="station-{{ station.id }}">
+        <div class="card-header text-white station-header d-flex justify-content-between align-items-center {{ header_bg }}" 
+             data-bs-toggle="collapse" data-bs-target="#collapse-{{ station.id }}">
+            <div class="d-flex align-items-center gap-3">
+                {% if 'BLANKPASS' not in station.name %}
+                    {% if status.has_vacancies %} <span class="status-dot dot-red"></span> {% else %} <span class="status-dot dot-green"></span> {% endif %}
+                {% endif %}
+                <h5 class="m-0">{{ station.name }}</h5>
+            </div>
+            <small class="text-white">Visa/Dölj ▼</small>
+        </div>
+
+        <div id="collapse-{{ station.id }}" class="collapse show">
+            <div class="card-body">
+                {% if 'BLANKPASS' in station.name %}
+                    <div class="row g-3">
+                        {% for unit in station.units %}
+                            {% set shift = shift_map.get(unit.id, {}).get('Dag') %}
+                            {% set amb_val = shift.amb_id if shift and shift.amb_id else '' %}
+                            {% set vub_val = shift.vub_id if shift and shift.vub_id else '' %}
+                            {% set is_active = 'blankpass-active' if (shift and (shift.amb or shift.vub)) else '' %}
+                            
+                            {% set person_id = amb_val if amb_val else vub_val %}
+                            {% set person_name = shift.amb.name if shift.amb else (shift.vub.name if shift.vub else '') %}
+
+                            <div class="col-md-3 col-6">
+                                <div class="blankpass-box {{ is_active }}"
+                                     onclick="openModal(this)"
+                                     data-unit-id="{{ unit.id }}" 
+                                     data-unit-name="{{ unit.name }}" 
+                                     data-period="Dag"
+                                     data-amb="{{ amb_val }}"
+                                     data-vub="{{ vub_val }}"
+                                     data-requires-sits="False"
+                                     data-person-id="{{ person_id }}"
+                                     data-person-name="{{ person_name }}">
+                                    
+                                    <div class="fw-bold text-muted small mb-1">{{ unit.name }}</div>
+                                    {% if shift and (shift.amb or shift.vub) %}
+                                        <div class="fw-bold text-dark">{{ person_name }}</div>
+                                    {% else %}
+                                        <div class="text-muted small my-2">-- Ledig --</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="row fw-bold mb-2 text-muted uppercase text-center" style="font-size: 0.9em;">
+                        <div class="col-md-2 text-start">ENHET</div><div class="col-md-3">DAG</div><div class="col-md-3">MELLAN</div><div class="col-md-3">NATT</div><div class="col-md-1"></div>
+                    </div>
+                    {% for unit in station.units %}
+                    <div class="row unit-row align-items-center">
+                        <div class="col-md-2">
+                            <span class="fw-bold">{{ unit.name }}</span>
+                            {% if unit.requires_sits %} <div class="sits-badge d-inline-block mt-1">SITS</div> {% endif %}
+                            {% if unit.is_flex %} <span class="badge bg-success">FLEX</span> {% endif %}
+                        </div>
+                        
+                        {% for p in ['Dag', 'Mellan', 'Natt'] %}
+                            <div class="col-md-3">
+                                {% set shift = shift_map.get(unit.id, {}).get(p) %}
+                                {% set t_tid = unit.day_time if p == 'Dag' else (unit.night_time if p == 'Natt' else unit.mid_time) %}
+                                
+                                {% if t_tid %}
+                                    {% set warning = false %}
+                                    {% if unit.requires_sits and shift and ((shift.amb and not shift.amb.has_sits) or (shift.vub and not shift.vub.has_sits)) %}
+                                        {% set warning = true %}
+                                    {% endif %}
+                                    {% set amb_val = shift.amb_id if shift and shift.amb_id else '' %}
+                                    {% set vub_val = shift.vub_id if shift and shift.vub_id else '' %}
+                                    
+                                    <div class="shift-box {{ 'shift-warning' if warning else '' }}" 
+                                         onclick="openModal(this)"
+                                         data-unit-id="{{ unit.id }}" data-unit-name="{{ unit.name }}" data-period="{{ p }}"
+                                         data-amb="{{ amb_val }}" data-vub="{{ vub_val }}"
+                                         data-requires-sits="{{ unit.requires_sits }}">
+                                         <span class="time-label">{{ t_tid }}</span>
+                                        {% if shift and (shift.amb or shift.vub) %}
+                                            <div class="fw-bold text-primary">{{ shift.amb.name if shift.amb else '-' }}</div>
+                                            <div class="fw-bold text-success">{{ shift.vub.name if shift.vub else '-' }}</div>
+                                            {% if warning %}<div class="text-dark fw-bold small mt-1">⚠️ SITS SAKNAS</div>{% endif %}
+                                        {% else %} <small class="text-muted">Vakant</small> {% endif %}
+                                    </div>
+                                {% else %}
+                                    {% if p != 'Mellan' or unit.mid_time %}
+                                        <div class="shift-box shift-disabled"><span class="time-label">-</span><small class="text-muted">Ej i drift</small></div>
+                                    {% endif %}
+                                {% endif %}
+                            </div>
+                        {% endfor %}
+                    </div>
+                    {% endfor %}
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<div class="modal fade" id="editModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form action="/update_shift" method="POST">
+                <div class="modal-header">
+                    <h5 class="modal-title">Bemanna <span id="modalUnitName"></span> (<span id="modalPeriod"></span>)</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" name="date" value="{{ current_date }}">
+                    <input type="hidden" name="unit_id" id="inputUnitId">
+                    <input type="hidden" name="period" id="inputPeriod">
+                    <input type="hidden" id="unitRequiresSits">
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-primary" id="labelAmb">AMB</label>
+                        <select class="form-select" name="amb_id" id="selectAmb" onchange="checkWarnings()">
+                            <option value="" data-sits="False">-- Ingen vald --</option>
+                            {% for station_name, group in users|groupby('home_station') %}
+                                <optgroup label="{{ station_name }}">
+                                    {% for user in group %}
+                                        {% set busy = busy_users.get(user.id, {}) %}
+                                        {% set is_bp = false %}
+                                        {% set b_info = "" %}
+                                        {% set b_dag = busy.get('Dag', '') %}
+                                        {% set b_mid = busy.get('Mellan', '') %}
+                                        {% set b_natt = busy.get('Natt', '') %}
+                                        {% if 'Plats' in b_dag or 'Plats' in b_mid or 'Plats' in b_natt %}
+                                            {% set is_bp = true %}
+                                            {% set b_info = "(På: " ~ (b_dag or b_mid or b_natt) ~ ")" %}
+                                        {% endif %}
+                                        <option value="{{ user.id }}" data-sits="{{ user.has_sits }}" data-busy-dag="{{ b_dag }}" data-busy-mellan="{{ b_mid }}" data-busy-natt="{{ b_natt }}" data-is-blankpass="{{ is_bp }}" class="{{ 'text-primary fw-bold' if is_bp else '' }}">
+                                            {{ user.name }} {% if user.has_sits %}(SITS){% endif %} {{ b_info }}
+                                        </option>
+                                    {% endfor %}
+                                </optgroup>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="mb-3" id="vubContainer">
+                        <label class="form-label fw-bold text-success">VUB</label>
+                        <select class="form-select" name="vub_id" id="selectVub" onchange="checkWarnings()">
+                            <option value="" data-sits="False">-- Ingen vald --</option>
+                            {% for station_name, group in users|groupby('home_station') %}
+                                <optgroup label="{{ station_name }}">
+                                    {% for user in group %}
+                                        {% set busy = busy_users.get(user.id, {}) %}
+                                        {% set is_bp = false %}
+                                        {% set b_info = "" %}
+                                        {% set b_dag = busy.get('Dag', '') %}
+                                        {% set b_mid = busy.get('Mellan', '') %}
+                                        {% set b_natt = busy.get('Natt', '') %}
+                                        {% if 'Plats' in b_dag or 'Plats' in b_mid or 'Plats' in b_natt %}
+                                            {% set is_bp = true %}
+                                            {% set b_info = "(På: " ~ (b_dag or b_mid or b_natt) ~ ")" %}
+                                        {% endif %}
+                                        <option value="{{ user.id }}" data-sits="{{ user.has_sits }}" data-busy-dag="{{ b_dag }}" data-busy-mellan="{{ b_mid }}" data-busy-natt="{{ b_natt }}" data-is-blankpass="{{ is_bp }}" class="{{ 'text-primary fw-bold' if is_bp else '' }}">
+                                            {{ user.name }} {% if user.has_sits %}(SITS){% endif %} {{ b_info }}
+                                        </option>
+                                    {% endfor %}
+                                </optgroup>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div id="sitsWarning" class="alert alert-warning d-none mt-3">⚠️ <strong>SITS-VARNING:</strong> Denna bil kräver SITS.</div>
+                    <div id="doubleBookingWarning" class="alert alert-danger d-none mt-3">🛑 <strong>KROCK:</strong> <span id="doubleBookingText"></span></div>
+                    <div id="moveInfo" class="alert alert-success d-none mt-3">♻️ <strong>Flyttas:</strong> <span id="moveInfoText"></span> från sin resursplats.</div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Avbryt</button>
+                    <button type="submit" class="btn btn-primary">Spara ändringar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="moveModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form action="/move_staff" method="POST">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title">♻️ Flytta Resurs</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" name="date" value="{{ current_date }}">
+                    <input type="hidden" name="person_id" id="movePersonId">
+                    
+                    <h5 class="text-center mb-4">Flytta <span id="movePersonName" class="fw-bold"></span> till:</h5>
+                    
+                    <div class="mb-3">
+                        <label class="form-label text-muted">Välj vakant bil:</label>
+                        <select class="form-select form-select-lg" name="target_spot" id="moveTargetSpot" required>
+                            <option value="">-- Välj i listan --</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-danger me-auto" onclick="document.getElementById('editModal').show()">❌ Ta bort / Ändra</button>
+                    
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Avbryt</button>
+                    <button type="submit" class="btn btn-success">Bekräfta Flytt</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    var editModal = new bootstrap.Modal(document.getElementById('editModal'));
+    var moveModal = new bootstrap.Modal(document.getElementById('moveModal'));
+
+    function openModal(element) {
+        var unitId = element.getAttribute('data-unit-id');
+        var unitName = element.getAttribute('data-unit-name');
+        var period = element.getAttribute('data-period');
+        var ambId = element.getAttribute('data-amb');
+        var vubId = element.getAttribute('data-vub');
+        var personId = element.getAttribute('data-person-id'); // Endast för blankpass
+        var personName = element.getAttribute('data-person-name'); // Endast för blankpass
+        var requiresSits = element.getAttribute('data-requires-sits');
+
+        // LOGIK: Är det ett Blankpass som REDAN är tillsatt?
+        if (unitName.includes("Plats") && personId) {
+            // ÖPPNA FLYTT-MODALEN ISTÄLLET
+            document.getElementById('movePersonId').value = personId;
+            document.getElementById('movePersonName').innerText = personName;
+            
+            // Kopiera vakanslistan till modalen
+            var sourceSelect = document.getElementById('vacanciesData');
+            var targetSelect = document.getElementById('moveTargetSpot');
+            targetSelect.innerHTML = sourceSelect.innerHTML;
+            
+            moveModal.show();
+            return; // Stoppa här, öppna inte den vanliga modalen
+        }
+
+        // ANNARS: ÖPPNA VANLIGA MODALEN
+        document.getElementById('modalUnitName').innerText = unitName;
+        document.getElementById('modalPeriod').innerText = period;
+        document.getElementById('inputUnitId').value = unitId;
+        document.getElementById('inputPeriod').value = period;
+        document.getElementById('unitRequiresSits').value = requiresSits;
+        
+        document.getElementById('selectAmb').value = ambId;
+        document.getElementById('selectVub').value = vubId;
+
+        // Om Blankpass: Dölj VUB
+        if (unitName.includes("Plats")) {
+            document.getElementById('vubContainer').style.display = 'none';
+            document.getElementById('labelAmb').innerText = "Resurs / Personal";
+        } else {
+            document.getElementById('vubContainer').style.display = 'block';
+            document.getElementById('labelAmb').innerText = "AMB";
+        }
+
+        checkWarnings();
+        editModal.show();
+    }
+
+    function checkWarnings() {
+        checkSits();
+        checkDoubleBooking();
+    }
+
+    function checkSits() {
+        if (document.getElementById('modalUnitName').innerText.includes("Plats")) {
+            document.getElementById('sitsWarning').classList.add('d-none'); return;
+        }
+        var requiresSits = document.getElementById('unitRequiresSits').value === 'True';
+        var warningBox = document.getElementById('sitsWarning');
+        if (!requiresSits) { warningBox.classList.add('d-none'); return; }
+        
+        var ambSelect = document.getElementById('selectAmb');
+        var vubSelect = document.getElementById('selectVub');
+        var ambOption = ambSelect.options[ambSelect.selectedIndex];
+        var vubOption = vubSelect.options[vubSelect.selectedIndex];
+        
+        var showWarning = false;
+        if (ambSelect.value !== "" && ambOption.getAttribute('data-sits') !== 'True') showWarning = true;
+        if (vubSelect.value !== "" && vubOption.getAttribute('data-sits') !== 'True') showWarning = true;
+        
+        if (showWarning) warningBox.classList.remove('d-none'); else warningBox.classList.add('d-none');
+    }
+
+    function checkDoubleBooking() {
+        var warningBox = document.getElementById('doubleBookingWarning');
+        var warningText = document.getElementById('doubleBookingText');
+        var moveBox = document.getElementById('moveInfo');
+        var moveText = document.getElementById('moveInfoText');
+        var currentPeriod = document.getElementById('inputPeriod').value; 
+        var currentUnitName = document.getElementById('modalUnitName').innerText;
+        
+        var ambSelect = document.getElementById('selectAmb');
+        var vubSelect = document.getElementById('selectVub');
+        var ambOption = ambSelect.options[ambSelect.selectedIndex];
+        var vubOption = vubSelect.options[vubSelect.selectedIndex];
+        
+        var conflicts = [];
+        var moves = [];
+
+        function checkOption(option) {
+            if (option.value !== "") {
+                var busyUnit = option.getAttribute('data-busy-' + currentPeriod.toLowerCase());
+                if (busyUnit && busyUnit !== currentUnitName) {
+                    if (busyUnit.includes("Plats")) {
+                        moves.push(option.text.trim().split(' ')[0] + " (från " + busyUnit + ")");
+                    } else {
+                        conflicts.push(option.text.trim().split(' ')[0] + " jobbar redan på " + busyUnit);
+                    }
+                }
+            }
+        }
+
+        checkOption(ambOption);
+        checkOption(vubOption);
+
+        if (conflicts.length > 0) {
+            warningText.innerText = conflicts.join(', ');
+            warningBox.classList.remove('d-none');
+        } else {
+            warningBox.classList.add('d-none');
+        }
+
+        if (moves.length > 0) {
+            moveText.innerText = moves.join(', ');
+            moveBox.classList.remove('d-none');
+        } else {
+            moveBox.classList.add('d-none');
+        }
+    }
+</script>
+
+</body>
+</html>
