@@ -7,7 +7,7 @@ with app.app_context():
     db.create_all()
     print("Databas rensad och återskapad!")
 
-    # --- 1. SKAPA PERSONAL (Exempeldata - Admin kan lägga till fler sen) ---
+    # 1. PERSONAL
     users = [
         User(name="Sven Svensson", role="VUB", has_sits=True, home_station="Sollentuna"),
         User(name="Anna Andersson", role="SSK", has_sits=False, home_station="Sollentuna"),
@@ -18,11 +18,8 @@ with app.app_context():
     db.session.add_all(users)
     db.session.commit()
 
-    # --- 2. SKAPA STATIONER OCH BILAR ---
-    # Format för data: 
-    # ("Bilnamn", SITS, Flex, "Dagtid", "Mellantid", "Nattid")
-    # Om mellantid är "", blir rutan grå.
-
+    # 2. STATIONER & BILAR (Med Tider!)
+    # Format: ("Bilnamn", SITS, Flex, "Dagtid", "Mellantid", "Nattid")
     data = {
         "Sollentuna": [
             ("335-9110", False, False, "07:00-19:00", "", "19:00-07:00"),
@@ -72,34 +69,27 @@ with app.app_context():
         "FLEXBILAR (Övriga)": [
             ("FLEXBIL - Lindvreten", False, True, "07:30-16:30", "", "Ej i drift")
         ],
-        
-        # --- HÄR ÄR DEN NYA STRUKTUREN FÖR BLANKPASS ---
-        # Vi skapar "Plats 01" till "Plats 20".
-        # Vi använder bara "Dag"-kolumnen i koden sen för att hålla det enkelt, 
-        # men i databasen ser de ut som vanliga enheter.
         "BLANKPASS / RESURS": [
             (f"Plats {i:02d}", False, False, "Enl. schema", "", "") for i in range(1, 21)
         ]
     }
 
     for station_name, units in data.items():
-        # Skapa stationen
         station = Station(name=station_name)
         db.session.add(station)
         db.session.commit()
 
-        # Skapa bilar
         for u_data in units:
             unit = Unit(
                 name=u_data[0], 
                 station=station, 
                 requires_sits=u_data[1], 
                 is_flex=u_data[2],
-                day_time=u_data[3],   # Dag
-                mid_time=u_data[4],   # Mellan (Tomt för de flesta)
-                night_time=u_data[5]  # Natt
+                day_time=u_data[3],
+                mid_time=u_data[4],
+                night_time=u_data[5]
             )
             db.session.add(unit)
     
     db.session.commit()
-    print("Alla stationer inlagda med korrekt 3-skiftsstruktur!")
+    print("Databasen är uppdaterad med TIDER!")
