@@ -7,19 +7,18 @@ with app.app_context():
     db.create_all()
     print("Databas rensad och återskapad!")
 
-    # 1. PERSONAL
+    # 1. PERSONAL (Nu med rätt roll: AMB)
     users = [
         User(name="Sven Svensson", role="VUB", has_sits=True, home_station="Sollentuna"),
-        User(name="Anna Andersson", role="SSK", has_sits=False, home_station="Sollentuna"),
+        User(name="Anna Andersson", role="AMB", has_sits=False, home_station="Sollentuna"), # <-- ÄNDRAT
         User(name="Lars Larsson", role="VUB", has_sits=False, home_station="Norrtälje"),
-        User(name="Karin Karlsson", role="SSK", has_sits=True, home_station="Norrtälje"),
+        User(name="Karin Karlsson", role="AMB", has_sits=True, home_station="Norrtälje"),   # <-- ÄNDRAT
         User(name="Pool-Pelle", role="VUB", has_sits=False, home_station="Pool"),
     ]
     db.session.add_all(users)
     db.session.commit()
 
-    # 2. STATIONER & BILAR (Med Tider!)
-    # Format: ("Bilnamn", SITS, Flex, "Dagtid", "Mellantid", "Nattid")
+    # 2. STATIONER & BILAR
     data = {
         "Sollentuna": [
             ("335-9110", False, False, "07:00-19:00", "", "19:00-07:00"),
@@ -92,4 +91,4 @@ with app.app_context():
             db.session.add(unit)
     
     db.session.commit()
-    print("Databasen är uppdaterad med TIDER!")
+    print("Databasen är uppdaterad med AMB/VUB!")

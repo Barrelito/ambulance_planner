@@ -91,9 +91,9 @@
                 {% endif %}
             </div>
 
-            <div class="tab-pane fade" id="pills-profile">
+           <div class="tab-pane fade" id="pills-profile">
                 <div class="alert alert-info small">
-                    Här visas lediga pass som matchar din roll (<strong>{{ current_user.role }}</strong>).
+                    Här visas lediga pass 60 dagar framåt som matchar din roll (<strong>{{ current_user.role }}</strong>).
                 </div>
 
                 {% if vacancies %}
@@ -108,7 +108,9 @@
                             
                             <form action="/apply_interest" method="POST" class="mt-2">
                                 <input type="hidden" name="user_id" value="{{ current_user.id }}">
-                                <input type="hidden" name="shift_id" value="{{ v.id }}">
+                                <input type="hidden" name="date" value="{{ v.date }}">
+                                <input type="hidden" name="unit_id" value="{{ v.unit_id }}">
+                                <input type="hidden" name="period" value="{{ v.period }}">
                                 
                                 {% if v.has_applied %}
                                     <button type="button" class="btn btn-success w-100 btn-sm" disabled>✅ Intresse anmält</button>
@@ -125,8 +127,6 @@
                     </div>
                 {% endif %}
             </div>
-
-        </div>
 
     {% else %}
         <div class="text-center mt-5 text-muted">

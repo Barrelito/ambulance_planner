@@ -165,7 +165,7 @@
                         <div class="row g-2">
                             <div class="col-12"><label class="form-label small fw-bold text-muted">Namn</label><input type="text" name="name" class="form-control" placeholder="För- och efternamn" required></div>
                             <div class="col-6"><label class="form-label small fw-bold text-muted">Hemstation</label><select name="home_station" class="form-select"><option value="Pool">Pool (Ingen fast)</option>{% for station in stations %}<option value="{{ station.name }}">{{ station.name }}</option>{% endfor %}</select></div>
-                            <div class="col-6"><label class="form-label small fw-bold text-muted">Roll</label><select name="role" class="form-select"><option value="SSK">SSK</option><option value="VUB">VUB</option></select></div>
+                            <div class="col-6"><label class="form-label small fw-bold text-muted">Roll</label><select name="role" class="form-select"><option value="AMB">AMB</option><option value="VUB">VUB</option></select></div>
                             <div class="col-12 mt-2"><div class="form-check"><input class="form-check-input" type="checkbox" name="has_sits" id="sitsCheck"><label class="form-check-label" for="sitsCheck">Har SITS-kompetens</label></div></div>
                             <div class="col-12 mt-3"><button type="submit" class="btn btn-success w-100">Lägg till i listan</button></div>
                         </div>
