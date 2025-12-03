@@ -41,7 +41,7 @@ class AuditLog(db.Model):
     timestamp = db.Column(db.DateTime, default=datetime.now)
     action = db.Column(db.String(500), nullable=False)
 
-# --- NY TABELL: INTRESSEANMÄLAN (GNETA) ---
+# --- NY TABELL: GNETA/INTRESSE ---
 class Interest(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     shift_id = db.Column(db.Integer, db.ForeignKey('shift.id'), nullable=False)
