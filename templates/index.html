@@ -40,11 +40,6 @@
                 <a href="/dashboard" class="btn btn-primary btn-sm">📊 Samordnare</a>
                 <a href="/admin" class="btn btn-secondary btn-sm">🔧 Teknisk Admin</a>
             </div>
-
-            <div class="text-center py-4 border-top mt-5">
-    <a href="/logout" class="text-danger text-decoration-none small">Logga ut (Lås systemet)</a>
-</div>
-
         </div>
         <form action="/" method="GET" class="d-flex justify-content-between align-items-center bg-light p-2 rounded border">
             <a href="/?date={{ prev_date }}" class="btn btn-outline-dark fw-bold">‹ Föregående dag</a>
@@ -69,7 +64,7 @@
 
     {% set header_bg = 'bg-purple' if 'BLANKPASS' in station.name else 'bg-dark' %}
 
-    <div class="card mb-3 shadow-sm" id="station-{{ station.id }}">
+    <div class="card mb-3 shadow-sm" id="station-card-{{ station.id }}">
         <div class="card-header text-white station-header d-flex justify-content-between align-items-center {{ header_bg }}" 
              data-bs-toggle="collapse" data-bs-target="#collapse-{{ station.id }}">
             <div class="d-flex align-items-center gap-3">
@@ -81,7 +76,7 @@
             <small class="text-white">Visa/Dölj ▼</small>
         </div>
 
-        <div id="collapse-{{ station.id }}" class="collapse show">
+        <div id="collapse-{{ station.id }}" class="collapse show station-collapse">
             <div class="card-body">
                 {% if 'BLANKPASS' in station.name %}
                     <div class="row g-3">
@@ -90,7 +85,6 @@
                             {% set amb_val = shift.amb_id if shift and shift.amb_id else '' %}
                             {% set vub_val = shift.vub_id if shift and shift.vub_id else '' %}
                             {% set is_active = 'blankpass-active' if (shift and (shift.amb or shift.vub)) else '' %}
-                            
                             {% set person_id = amb_val if amb_val else vub_val %}
                             {% set person_name = shift.amb.name if shift.amb else (shift.vub.name if shift.vub else '') %}
 
@@ -127,12 +121,10 @@
                             {% if unit.requires_sits %} <div class="sits-badge d-inline-block mt-1">SITS</div> {% endif %}
                             {% if unit.is_flex %} <span class="badge bg-success">FLEX</span> {% endif %}
                         </div>
-                        
                         {% for p in ['Dag', 'Mellan', 'Natt'] %}
                             <div class="col-md-3">
                                 {% set shift = shift_map.get(unit.id, {}).get(p) %}
                                 {% set t_tid = unit.day_time if p == 'Dag' else (unit.night_time if p == 'Natt' else unit.mid_time) %}
-                                
                                 {% if t_tid %}
                                     {% set warning = false %}
                                     {% if unit.requires_sits and shift and ((shift.amb and not shift.amb.has_sits) or (shift.vub and not shift.vub.has_sits)) %}
@@ -259,9 +251,7 @@
                 <div class="modal-body">
                     <input type="hidden" name="date" value="{{ current_date }}">
                     <input type="hidden" name="person_id" id="movePersonId">
-                    
                     <h5 class="text-center mb-4">Flytta <span id="movePersonName" class="fw-bold"></span> till:</h5>
-                    
                     <div class="mb-3">
                         <label class="form-label text-muted">Välj vakant bil:</label>
                         <select class="form-select form-select-lg" name="target_spot" id="moveTargetSpot" required>
@@ -271,7 +261,6 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-outline-danger me-auto" onclick="document.getElementById('editModal').show()">❌ Ta bort / Ändra</button>
-                    
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Avbryt</button>
                     <button type="submit" class="btn btn-success">Bekräfta Flytt</button>
                 </div>
@@ -285,32 +274,50 @@
     var editModal = new bootstrap.Modal(document.getElementById('editModal'));
     var moveModal = new bootstrap.Modal(document.getElementById('moveModal'));
 
+    // --- LOGIK FÖR ATT KOMMA IHÅG ÖPPNA/STÄNGDA STATIONER ---
+    document.addEventListener("DOMContentLoaded", function() {
+        var collapses = document.querySelectorAll('.station-collapse');
+        
+        collapses.forEach(function(el) {
+            // Hämta status från LocalStorage
+            var storedState = localStorage.getItem(el.id);
+            
+            // Om den är markerad som 'closed', ta bort 'show' klassen
+            if (storedState === 'closed') {
+                el.classList.remove('show');
+            }
+            
+            // Lyssna på ändringar
+            el.addEventListener('hidden.bs.collapse', function () {
+                localStorage.setItem(el.id, 'closed');
+            });
+            el.addEventListener('shown.bs.collapse', function () {
+                localStorage.setItem(el.id, 'open');
+            });
+        });
+    });
+
+    // --- ÖVRIG LOGIK (MODAL ETC) ---
     function openModal(element) {
         var unitId = element.getAttribute('data-unit-id');
         var unitName = element.getAttribute('data-unit-name');
         var period = element.getAttribute('data-period');
         var ambId = element.getAttribute('data-amb');
         var vubId = element.getAttribute('data-vub');
-        var personId = element.getAttribute('data-person-id'); // Endast för blankpass
-        var personName = element.getAttribute('data-person-name'); // Endast för blankpass
+        var personId = element.getAttribute('data-person-id');
+        var personName = element.getAttribute('data-person-name');
         var requiresSits = element.getAttribute('data-requires-sits');
 
-        // LOGIK: Är det ett Blankpass som REDAN är tillsatt?
         if (unitName.includes("Plats") && personId) {
-            // ÖPPNA FLYTT-MODALEN ISTÄLLET
             document.getElementById('movePersonId').value = personId;
             document.getElementById('movePersonName').innerText = personName;
-            
-            // Kopiera vakanslistan till modalen
             var sourceSelect = document.getElementById('vacanciesData');
             var targetSelect = document.getElementById('moveTargetSpot');
             targetSelect.innerHTML = sourceSelect.innerHTML;
-            
             moveModal.show();
-            return; // Stoppa här, öppna inte den vanliga modalen
+            return; 
         }
 
-        // ANNARS: ÖPPNA VANLIGA MODALEN
         document.getElementById('modalUnitName').innerText = unitName;
         document.getElementById('modalPeriod').innerText = period;
         document.getElementById('inputUnitId').value = unitId;
@@ -320,7 +327,6 @@
         document.getElementById('selectAmb').value = ambId;
         document.getElementById('selectVub').value = vubId;
 
-        // Om Blankpass: Dölj VUB
         if (unitName.includes("Plats")) {
             document.getElementById('vubContainer').style.display = 'none';
             document.getElementById('labelAmb').innerText = "Resurs / Personal";
@@ -333,10 +339,7 @@
         editModal.show();
     }
 
-    function checkWarnings() {
-        checkSits();
-        checkDoubleBooking();
-    }
+    function checkWarnings() { checkSits(); checkDoubleBooking(); }
 
     function checkSits() {
         if (document.getElementById('modalUnitName').innerText.includes("Plats")) {
@@ -354,7 +357,6 @@
         var showWarning = false;
         if (ambSelect.value !== "" && ambOption.getAttribute('data-sits') !== 'True') showWarning = true;
         if (vubSelect.value !== "" && vubOption.getAttribute('data-sits') !== 'True') showWarning = true;
-        
         if (showWarning) warningBox.classList.remove('d-none'); else warningBox.classList.add('d-none');
     }
 
@@ -365,12 +367,10 @@
         var moveText = document.getElementById('moveInfoText');
         var currentPeriod = document.getElementById('inputPeriod').value; 
         var currentUnitName = document.getElementById('modalUnitName').innerText;
-        
         var ambSelect = document.getElementById('selectAmb');
         var vubSelect = document.getElementById('selectVub');
         var ambOption = ambSelect.options[ambSelect.selectedIndex];
         var vubOption = vubSelect.options[vubSelect.selectedIndex];
-        
         var conflicts = [];
         var moves = [];
 
@@ -378,31 +378,15 @@
             if (option.value !== "") {
                 var busyUnit = option.getAttribute('data-busy-' + currentPeriod.toLowerCase());
                 if (busyUnit && busyUnit !== currentUnitName) {
-                    if (busyUnit.includes("Plats")) {
-                        moves.push(option.text.trim().split(' ')[0] + " (från " + busyUnit + ")");
-                    } else {
-                        conflicts.push(option.text.trim().split(' ')[0] + " jobbar redan på " + busyUnit);
-                    }
+                    if (busyUnit.includes("Plats")) moves.push(option.text.trim().split(' ')[0] + " (från " + busyUnit + ")");
+                    else conflicts.push(option.text.trim().split(' ')[0] + " jobbar redan på " + busyUnit);
                 }
             }
         }
+        checkOption(ambOption); checkOption(vubOption);
 
-        checkOption(ambOption);
-        checkOption(vubOption);
-
-        if (conflicts.length > 0) {
-            warningText.innerText = conflicts.join(', ');
-            warningBox.classList.remove('d-none');
-        } else {
-            warningBox.classList.add('d-none');
-        }
-
-        if (moves.length > 0) {
-            moveText.innerText = moves.join(', ');
-            moveBox.classList.remove('d-none');
-        } else {
-            moveBox.classList.add('d-none');
-        }
+        if (conflicts.length > 0) { warningText.innerText = conflicts.join(', '); warningBox.classList.remove('d-none'); } else warningBox.classList.add('d-none');
+        if (moves.length > 0) { moveText.innerText = moves.join(', '); moveBox.classList.remove('d-none'); } else moveBox.classList.add('d-none');
     }
 </script>
 
