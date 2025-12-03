@@ -29,10 +29,23 @@
         .comment-icon { position: absolute; top: 2px; right: 5px; font-size: 1.2em; }
         .interest-icon { position: absolute; top: 2px; left: 5px; font-size: 1.0em; text-shadow: 0 0 3px yellow; }
         
-        /* FIX: Göm den gamla fula listan helt när Select2 är igång */
-        .select2-hidden-accessible { display: none !important; visibility: hidden !important; }
+        /* --- HÄR ÄR FIXEN FÖR DUBBLA LISTOR --- */
+        /* Tvinga original-listan att vara helt osynlig när Select2 tagit över */
+        select.select2-hidden-accessible {
+            position: absolute !important;
+            width: 1px !important;
+            height: 1px !important;
+            padding: 0 !important;
+            margin: -1px !important;
+            overflow: hidden !important;
+            clip: rect(0,0,0,0) !important;
+            white-space: nowrap !important;
+            border: 0 !important;
+            opacity: 0 !important;
+        }
         
-        /* Justering för Select2 utseende */
+        /* Justering för Select2 utseende i modal */
+        .select2-container { width: 100% !important; }
         .select2-container--bootstrap-5 .select2-selection { border-color: #dee2e6; }
     </style>
 </head>
@@ -363,7 +376,6 @@
         document.getElementById('unitRequiresC1').value = requiresC1; 
         document.getElementById('inputComment').value = comment;
 
-        // Fyll i värden och trigga Select2
         $('#selectAmb').val(ambId).trigger('change');
         $('#selectVub').val(vubId).trigger('change');
 
