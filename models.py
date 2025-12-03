@@ -10,12 +10,11 @@ class Unit(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(20), unique=True, nullable=False)
     station_id = db.Column(db.Integer, db.ForeignKey('station.id'), nullable=False)
-    
     requires_sits = db.Column(db.Boolean, default=False)
     is_flex = db.Column(db.Boolean, default=False)
     
-    # NYTT: C1-KRAV
-    requires_c1 = db.Column(db.Boolean, default=False)
+    # VIKTIGT: Detta fält måste finnas!
+    requires_c1 = db.Column(db.Boolean, default=False) 
 
     day_time = db.Column(db.String(20), default="07:00-19:00")
     mid_time = db.Column(db.String(20), default="")
@@ -27,7 +26,7 @@ class User(db.Model):
     role = db.Column(db.String(20)) 
     has_sits = db.Column(db.Boolean, default=False)
     
-    # NYTT: C1-KÖRKORT
+    # VIKTIGT: Detta fält måste finnas!
     has_c1 = db.Column(db.Boolean, default=False)
     
     home_station = db.Column(db.String(50), default="Pool") 
