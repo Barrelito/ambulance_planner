@@ -10,8 +10,10 @@
         .grid-label { width: 80px; font-weight: bold; font-size: 0.9em; }
         .day-col { flex: 1; text-align: center; }
         .day-header { font-size: 0.7em; font-weight: bold; text-transform: uppercase; color: #666; }
-        /* Gör varannan vecka lite gråare för enklare läsning */
         .grid-row:nth-child(even) { background-color: #f9f9f9; border-radius: 4px; }
+        
+        /* Markera input-fältet när man fokuserar */
+        .highlight-input { border: 2px solid #0d6efd; box-shadow: 0 0 5px rgba(13,110,253,0.5); }
     </style>
 </head>
 <body class="bg-light">
@@ -70,9 +72,8 @@
                         <label class="form-label fw-bold">4. Begränsningsperiod</label>
                         <div class="input-group">
                             <input type="number" id="totalWeeks" name="total_weeks" class="form-control" value="15" min="1" required>
-                            <span class="input-group-text">veckor</span>
+                            <span class="input-group-text">veckor totalt</span>
                         </div>
-                        <div class="form-text">Hur länge varar hela perioden?</div>
                     </div>
                 </div>
 
@@ -82,20 +83,20 @@
                     <h5 class="m-0">5. Bygg schemat</h5>
                     
                     <div class="btn-group">
-                        <button type="button" class="btn btn-outline-primary btn-sm" onclick="setRolling()">🔄 Rullande (5v)</button>
+                        <button type="button" class="btn btn-outline-primary btn-sm" onclick="setRolling()">🔄 Rullande schema</button>
                         <button type="button" class="btn btn-outline-dark btn-sm" onclick="setWish()">📝 Önskeschema (Hela perioden)</button>
                     </div>
                 </div>
 
                 <div class="row mb-3 align-items-center bg-light p-2 rounded border">
                     <div class="col-auto">
-                        <label class="fw-bold">Antal veckor att fylla i:</label>
+                        <label class="fw-bold">Antal veckor i cykeln:</label>
                     </div>
                     <div class="col-auto">
                         <input type="number" id="cycleWeeks" name="cycle_weeks" class="form-control fw-bold text-center" value="5" min="1" max="52" style="width: 80px;" onchange="buildGrid()">
                     </div>
                     <div class="col-auto">
-                        <span class="text-muted small" id="cycleHelpText">Systemet repeterar dessa 5 veckor tills perioden är slut.</span>
+                        <span class="text-muted small" id="cycleHelpText">Systemet repeterar dessa veckor tills perioden är slut.</span>
                     </div>
                 </div>
 
@@ -121,17 +122,20 @@
 </div>
 
 <script>
-    // Funktioner för knapparna
     function setRolling() {
-        document.getElementById('cycleWeeks').value = 5;
-        document.getElementById('cycleHelpText').innerText = "Systemet repeterar dessa 5 veckor tills perioden är slut.";
+        const input = document.getElementById('cycleWeeks');
+        input.value = 5; // Sätter standard, men man får ändra
+        document.getElementById('cycleHelpText').innerText = "Systemet repeterar dessa veckor tills perioden är slut. (Ändra siffran om schemat rullar på annat antal veckor).";
+        
+        // Markera fältet så man fattar att man kan ändra
+        input.focus();
+        input.select();
+        
         buildGrid();
     }
 
     function setWish() {
-        // Hämta totala antalet veckor
         var total = document.getElementById('totalWeeks').value;
-        // Sätt cykeln till samma sak
         document.getElementById('cycleWeeks').value = total;
         document.getElementById('cycleHelpText').innerText = "Du fyller i hela perioden manuellt (inget repeteras).";
         buildGrid();
