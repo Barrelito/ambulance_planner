@@ -237,7 +237,7 @@
                     </div>
 
                     <div class="mb-3" id="vubContainer">
-                        <label class="form-label fw-bold text-success">VUB (Vårdar)</label>
+                        <label class="form-label fw-bold text-success">VUB</label>
                         <select class="form-select" name="vub_id" id="selectVub" onchange="checkWarnings()">
                             <option value="" data-sits="False" data-c1="False" data-role="None">-- Ingen vald --</option>
                             {% for station_name, group in users|groupby('home_station') %}
@@ -361,7 +361,7 @@
             document.getElementById('labelAmb').innerText = "Resurs / Personal";
         } else {
             document.getElementById('vubContainer').style.display = 'block';
-            document.getElementById('labelAmb').innerText = "AMB (Kör)";
+            document.getElementById('labelAmb').innerText = "AMB";
         }
         checkWarnings(); editModal.show();
     }
