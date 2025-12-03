@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+    <meta charset="UTF-8">
+    <title>Schemaläggaren</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .day-select { font-size: 0.8em; padding: 2px; }
+        .grid-row { display: flex; gap: 5px; margin-bottom: 5px; align-items: center; }
+        .grid-label { width: 80px; font-weight: bold; }
+        .day-col { flex: 1; text-align: center; }
+        .day-header { font-size: 0.7em; font-weight: bold; text-transform: uppercase; color: #666; }
+    </style>
+</head>
+<body class="bg-light">
+
+<nav class="navbar navbar-dark bg-success mb-4">
+    <div class="container">
+        <span class="navbar-brand mb-0 h1">📅 Schemaläggaren (Massbokning)</span>
+        <a href="/dashboard" class="btn btn-light btn-sm">Tillbaka</a>
+    </div>
+</nav>
+
+<div class="container">
+    <div class="card shadow">
+        <div class="card-body">
+            
+            <form action="/scheduler/generate" method="POST">
+                
+                <div class="row mb-4">
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold">1. Välj Personal</label>
+                        <select name="user_id" class="form-select" required>
+                            <option value="">-- Välj person --</option>
+                            {% for user in users %}
+                                <option value="{{ user.id }}">{{ user.name }} ({{ user.home_station }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold">2. Välj Bil/Plats</label>
+                        <select name="unit_id" id="unitSelect" class="form-select" required onchange="buildGrid()">
+                            <option value="" data-day="" data-night="" data-mid="">-- Välj bil --</option>
+                            {% for station in stations %}
+                                <optgroup label="{{ station.name }}">
+                                    {% for unit in station.units %}
+                                        <option value="{{ unit.id }}" 
+                                                data-day="{{ unit.day_time }}" 
+                                                data-night="{{ unit.night_time }}"
+                                                data-mid="{{ unit.mid_time }}">
+                                            {{ unit.name }}
+                                        </option>
+                                    {% endfor %}
+                                </optgroup>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <hr>
+
+                <div class="row mb-4">
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold">3. Startdatum</label>
+                        <input type="date" name="start_date" class="form-control" required>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold">4. Begränsningsperiod (Antal veckor)</label>
+                        <input type="number" name="total_weeks" class="form-control" value="15" min="1" required>
+                        <div class="form-text">Hur länge ska schemat rulla? (T.ex. 15 veckor)</div>
+                    </div>
+                </div>
+
+                <hr>
+
+                <h5 class="mb-3">5. Bygg schemacykeln</h5>
+                <div class="row mb-3 align-items-center">
+                    <div class="col-auto">
+                        <label>Hur många veckor rullar schemat på?</label>
+                    </div>
+                    <div class="col-auto">
+                        <input type="number" id="cycleWeeks" name="cycle_weeks" class="form-control" value="5" min="1" max="10" style="width: 80px;" onchange="buildGrid()">
+                    </div>
+                </div>
+
+                <div class="p-3 bg-white border rounded mb-4">
+                    <div class="grid-row">
+                        <div class="grid-label"></div>
+                        <div class="day-col day-header">Mån</div>
+                        <div class="day-col day-header">Tis</div>
+                        <div class="day-col day-header">Ons</div>
+                        <div class="day-col day-header">Tor</div>
+                        <div class="day-col day-header">Fre</div>
+                        <div class="day-col day-header">Lör</div>
+                        <div class="day-col day-header text-danger">Sön</div>
+                    </div>
+                    <div id="gridContainer"></div>
+                </div>
+
+                <div class="alert alert-info">
+                    ℹ️ <strong>Tips:</strong> Systemet repeterar cykeln tills perioden är slut. Om du väljer en ny bil uppdateras tiderna automatiskt ovan.
+                </div>
+
+                <button type="submit" class="btn btn-success w-100 py-3 fw-bold text-uppercase">Generera Schema 🚀</button>
+
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    function buildGrid() {
+        const weeks = document.getElementById('cycleWeeks').value;
+        const container = document.getElementById('gridContainer');
+        const unitSelect = document.getElementById('unitSelect');
+        const selectedOption = unitSelect.options[unitSelect.selectedIndex];
+        
+        let dayTime = "07:00-19:00";
+        let nightTime = "19:00-07:00";
+        let midTime = "";
+
+        if (selectedOption && selectedOption.value !== "") {
+            dayTime = selectedOption.getAttribute('data-day');
+            nightTime = selectedOption.getAttribute('data-night');
+            midTime = selectedOption.getAttribute('data-mid');
+        }
+
+        container.innerHTML = ''; 
+
+        for (let w = 1; w <= weeks; w++) {
+            const row = document.createElement('div');
+            row.className = 'grid-row';
+            
+            const label = document.createElement('div');
+            label.className = 'grid-label';
+            label.innerText = 'Vecka ' + w;
+            row.appendChild(label);
+
+            for (let d = 1; d <= 7; d++) {
+                const col = document.createElement('div');
+                col.className = 'day-col';
+                const select = document.createElement('select');
+                select.className = 'form-select day-select';
+                select.name = `day_${w}_${d}`;
+                
+                const opOff = document.createElement('option');
+                opOff.value = 'OFF'; opOff.innerText = '-'; opOff.style.color = '#ccc';
+                select.appendChild(opOff);
+
+                const opDag = document.createElement('option');
+                opDag.value = 'Dag'; opDag.innerText = `Dag (${dayTime})`; opDag.style.fontWeight = 'bold';
+                select.appendChild(opDag);
+
+                if (midTime && midTime !== "") {
+                    const opMid = document.createElement('option');
+                    opMid.value = 'Mellan'; opMid.innerText = `Mellan (${midTime})`;
+                    select.appendChild(opMid);
+                }
+
+                const opNatt = document.createElement('option');
+                opNatt.value = 'Natt'; opNatt.innerText = `Natt (${nightTime})`;
+                select.appendChild(opNatt);
+
+                select.onchange = function() {
+                    if(this.value === 'OFF') this.style.backgroundColor = 'white';
+                    if(this.value === 'Dag') this.style.backgroundColor = '#d1e7dd';
+                    if(this.value === 'Natt') this.style.backgroundColor = '#cfe2ff';
+                    if(this.value === 'Mellan') this.style.backgroundColor = '#fff3cd';
+                };
+                col.appendChild(select);
+                row.appendChild(col);
+            }
+            container.appendChild(row);
+        }
+    }
+    buildGrid();
+</script>
+</body>
+</html>
