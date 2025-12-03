@@ -29,7 +29,10 @@
         .comment-icon { position: absolute; top: 2px; right: 5px; font-size: 1.2em; }
         .interest-icon { position: absolute; top: 2px; left: 5px; font-size: 1.0em; text-shadow: 0 0 3px yellow; }
         
-        /* Justering för Select2 i Bootstrap */
+        /* FIX: Göm den gamla fula listan helt när Select2 är igång */
+        .select2-hidden-accessible { display: none !important; visibility: hidden !important; }
+        
+        /* Justering för Select2 utseende */
         .select2-container--bootstrap-5 .select2-selection { border-color: #dee2e6; }
     </style>
 </head>
@@ -210,7 +213,7 @@
 
                     <div class="mb-3">
                         <label class="form-label fw-bold text-primary" id="labelAmb">AMB</label>
-                        <select class="form-select" name="amb_id" id="selectAmb" style="width: 100%;">
+                        <select name="amb_id" id="selectAmb" style="width: 100%;">
                             <option value="" data-sits="False" data-c1="False" data-role="None">-- Ingen vald --</option>
                             {% for station_name, group in users|groupby('home_station') %}
                                 <optgroup label="{{ station_name }}">
@@ -245,7 +248,7 @@
 
                     <div class="mb-3" id="vubContainer">
                         <label class="form-label fw-bold text-success">VUB</label>
-                        <select class="form-select" name="vub_id" id="selectVub" style="width: 100%;">
+                        <select name="vub_id" id="selectVub" style="width: 100%;">
                             <option value="" data-sits="False" data-c1="False" data-role="None">-- Ingen vald --</option>
                             {% for station_name, group in users|groupby('home_station') %}
                                 <optgroup label="{{ station_name }}">
@@ -302,7 +305,6 @@
     var editModal = new bootstrap.Modal(document.getElementById('editModal'));
     var moveModal = new bootstrap.Modal(document.getElementById('moveModal'));
 
-    // 1. INITIERA SELECT2 (SÖKBARA LISTOR)
     $(document).ready(function() {
         $('#selectAmb').select2({
             dropdownParent: $('#editModal'),
@@ -317,7 +319,6 @@
             allowClear: true
         });
 
-        // VIKTIGT: Koppla varning-checken till Select2:s "change"-event
         $('#selectAmb').on('change', checkWarnings);
         $('#selectVub').on('change', checkWarnings);
     });
@@ -362,7 +363,7 @@
         document.getElementById('unitRequiresC1').value = requiresC1; 
         document.getElementById('inputComment').value = comment;
 
-        // UPPDATERA SELECT2 VÄRDEN (Måste använda jQuery .val().trigger('change'))
+        // Fyll i värden och trigga Select2
         $('#selectAmb').val(ambId).trigger('change');
         $('#selectVub').val(vubId).trigger('change');
 
@@ -395,7 +396,6 @@
             document.getElementById('labelAmb').innerText = "AMB";
         }
         
-        // Vänte en millisekund så Select2 hinner rita upp sig
         setTimeout(checkWarnings, 50);
         editModal.show();
     }
@@ -411,11 +411,9 @@
         var requiresSits = document.getElementById('unitRequiresSits').value === 'True';
         var requiresC1 = document.getElementById('unitRequiresC1').value === 'True';
         
-        // Hämta värden från Select2 (jQuery) eller native om det strular
         var ambId = $('#selectAmb').val();
         var vubId = $('#selectVub').val();
         
-        // Hitta selected options i DOM:en (Select2 döljer dem, men de är valda)
         var ambOption = document.querySelector(`#selectAmb option[value='${ambId}']`);
         var vubOption = document.querySelector(`#selectVub option[value='${vubId}']`);
 
