@@ -1,4 +1,5 @@
 from database import db
+from datetime import datetime
 
 class Station(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -26,14 +27,17 @@ class Shift(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     date = db.Column(db.String(10), nullable=False) 
     period = db.Column(db.String(10), nullable=False) 
-    
     unit_id = db.Column(db.Integer, db.ForeignKey('unit.id'), nullable=False)
     amb_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
     vub_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
-    
-    # --- NYTT FÄLT: KOMMENTAR ---
-    comment = db.Column(db.String(250), nullable=True) 
+    comment = db.Column(db.String(250), nullable=True)
     
     amb = db.relationship('User', foreign_keys=[amb_id])
     vub = db.relationship('User', foreign_keys=[vub_id])
     unit = db.relationship('Unit')
+
+# --- NY TABELL: HÄNDELSELOGG ---
+class AuditLog(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    timestamp = db.Column(db.DateTime, default=datetime.now) # När hände det?
+    action = db.Column(db.String(500), nullable=False)       # Vad hände?
