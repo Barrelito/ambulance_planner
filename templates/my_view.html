@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Min Sida</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .nav-pills .nav-link.active { background-color: #0d6efd; }
+        .shift-card { border-left: 5px solid #0d6efd; margin-bottom: 10px; }
+        .vacancy-card { border-left: 5px solid #dc3545; margin-bottom: 10px; }
+        .colleague-box { background-color: #f0f2f5; padding: 5px 10px; border-radius: 5px; font-size: 0.9em; margin-top: 5px; }
+    </style>
+</head>
+<body class="bg-light">
+
+<nav class="navbar navbar-dark bg-dark mb-3">
+    <div class="container-fluid">
+        <span class="navbar-brand mb-0 h1">📱 Min Sida</span>
+        <a href="/" class="btn btn-sm btn-outline-light">Till Planering</a>
+    </div>
+</nav>
+
+<div class="container">
+
+    <div class="card mb-4 shadow-sm">
+        <div class="card-body">
+            <form action="/my_view" method="GET" onchange="this.submit()">
+                <label class="small text-muted fw-bold">Vem är du?</label>
+                <select name="user_id" class="form-select form-select-lg">
+                    <option value="">-- Välj ditt namn --</option>
+                    {% for u in all_users %}
+                        <option value="{{ u.id }}" {% if current_user and current_user.id == u.id %}selected{% endif %}>
+                            {{ u.name }} ({{ u.role }})
+                        </option>
+                    {% endfor %}
+                </select>
+            </form>
+        </div>
+    </div>
+
+    {% if current_user %}
+        
+        <ul class="nav nav-pills nav-fill mb-3" id="pills-tab" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active fw-bold" id="pills-home-tab" data-bs-toggle="pill" data-bs-target="#pills-home" type="button">
+                    📅 Mina Pass
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link fw-bold text-danger" id="pills-profile-tab" data-bs-toggle="pill" data-bs-target="#pills-profile" type="button">
+                    ✨ Lediga Pass
+                </button>
+            </li>
+        </ul>
+
+        <div class="tab-content" id="pills-tabContent">
+            
+            <div class="tab-pane fade show active" id="pills-home">
+                {% if my_shifts %}
+                    {% for item in my_shifts %}
+                    <div class="card shift-card shadow-sm">
+                        <div class="card-body py-2">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <h5 class="m-0">{{ item.date }}</h5>
+                                <span class="badge bg-secondary">{{ item.period }}</span>
+                            </div>
+                            <div class="text-primary fw-bold mt-1">{{ item.station }} - {{ item.unit }}</div>
+                            <div class="small text-muted">{{ item.time }}</div>
+                            
+                            {% if item.colleague %}
+                                <div class="colleague-box">
+                                    👷‍♂️ <strong>Kollega:</strong> {{ item.colleague }}
+                                </div>
+                            {% else %}
+                                <div class="colleague-box text-danger">
+                                    ⚠️ Kollega saknas
+                                </div>
+                            {% endif %}
+
+                            {% if item.comment %}
+                                <div class="mt-2 small text-muted">💬 "{{ item.comment }}"</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="text-center text-muted mt-5">
+                        <p>Du har inga inbokade pass framöver.</p>
+                    </div>
+                {% endif %}
+            </div>
+
+            <div class="tab-pane fade" id="pills-profile">
+                <div class="alert alert-info small">
+                    Här visas lediga pass som matchar din roll (<strong>{{ current_user.role }}</strong>).
+                </div>
+
+                {% if vacancies %}
+                    {% for v in vacancies %}
+                    <div class="card vacancy-card shadow-sm">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <h6 class="fw-bold">{{ v.date }} ({{ v.period }})</h6>
+                                <span class="badge bg-light text-dark border">{{ v.time }}</span>
+                            </div>
+                            <div>{{ v.station }} - {{ v.unit }}</div>
+                            
+                            <form action="/apply_interest" method="POST" class="mt-2">
+                                <input type="hidden" name="user_id" value="{{ current_user.id }}">
+                                <input type="hidden" name="shift_id" value="{{ v.id }}">
+                                
+                                {% if v.has_applied %}
+                                    <button type="button" class="btn btn-success w-100 btn-sm" disabled>✅ Intresse anmält</button>
+                                {% else %}
+                                    <button type="submit" class="btn btn-outline-danger w-100 btn-sm">🙋‍♂️ Anmäl intresse</button>
+                                {% endif %}
+                            </form>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="text-center text-muted mt-5">
+                        <p>Just nu finns inga lediga pass för din roll.</p>
+                    </div>
+                {% endif %}
+            </div>
+
+        </div>
+
+    {% else %}
+        <div class="text-center mt-5 text-muted">
+            <p>Välj ditt namn i listan ovan för att se ditt schema.</p>
+        </div>
+    {% endif %}
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

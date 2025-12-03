@@ -268,4 +268,107 @@ def generate_template():
     return send_file(output, download_name=f"Mall_{y}_{m}.xlsx", as_attachment=True)
 
 if __name__ == "__main__":
+
+    # --- MIN SIDA & GNETA ---
+@app.route('/my_view', methods=['GET'])
+def my_view():
+    # Vi behöver inloggning, men här fejkar vi den via dropdown i HTML
+    # Om du hade riktig inloggning skulle vi använda session['user_id']
+    
+    all_users = User.query.order_by(User.name).all()
+    user_id = request.args.get('user_id')
+    
+    my_shifts = []
+    vacancies = []
+    current_user = None
+
+    if user_id:
+        current_user = User.query.get(user_id)
+        today_str = date.today().strftime('%Y-%m-%d')
+
+        # 1. HÄMTA MINA PASS
+        # Vi letar där jag är AMB eller VUB
+        shifts = Shift.query.filter(
+            ((Shift.amb_id == user_id) | (Shift.vub_id == user_id)),
+            Shift.date >= today_str
+        ).order_by(Shift.date).all()
+
+        for s in shifts:
+            # Hitta kollega
+            colleague_name = None
+            if s.amb_id == int(user_id):
+                # Jag är AMB, vem är VUB?
+                colleague_name = s.vub.name if s.vub else None
+            else:
+                # Jag är VUB, vem är AMB?
+                colleague_name = s.amb.name if s.amb else None
+            
+            tid = s.unit.day_time if s.period == 'Dag' else (s.unit.night_time if s.period == 'Natt' else s.unit.mid_time)
+
+            my_shifts.append({
+                'date': s.date,
+                'period': s.period,
+                'station': s.unit.station.name,
+                'unit': s.unit.name,
+                'time': tid,
+                'colleague': colleague_name,
+                'comment': s.comment
+            })
+
+        # 2. HÄMTA LEDIGA PASS (GNETA)
+        # Hämta alla pass framåt där min roll saknas
+        # OBS: Detta hittar bara pass som REDAN FINNS i databasen (t.ex. någon har tagits bort).
+        # Att generera alla teoretiska pass här blir tungt, vi börjar så här.
+        
+        potential_shifts = Shift.query.filter(Shift.date >= today_str).order_by(Shift.date).all()
+        
+        # Hämta mina intresseanmälningar för att se vad jag redan sökt
+        my_interests = [i.shift_id for i in Interest.query.filter_by(user_id=user_id).all()]
+
+        for s in potential_shifts:
+            is_vacant = False
+            
+            # Om jag är AMB, kolla om AMB-platsen är tom
+            if current_user.role == 'SSK' and s.amb_id is None:
+                is_vacant = True
+            
+            # Om jag är VUB, kolla om VUB-platsen är tom
+            if current_user.role == 'VUB' and s.vub_id is None:
+                is_vacant = True
+            
+            if is_vacant:
+                tid = s.unit.day_time if s.period == 'Dag' else (s.unit.night_time if s.period == 'Natt' else s.unit.mid_time)
+                vacancies.append({
+                    'id': s.id,
+                    'date': s.date,
+                    'period': s.period,
+                    'station': s.unit.station.name,
+                    'unit': s.unit.name,
+                    'time': tid,
+                    'has_applied': s.id in my_interests
+                })
+
+    return render_template('my_view.html', all_users=all_users, current_user=current_user, my_shifts=my_shifts, vacancies=vacancies)
+
+@app.route('/apply_interest', methods=['POST'])
+def apply_interest():
+    user_id = request.form.get('user_id')
+    shift_id = request.form.get('shift_id')
+    
+    # Kolla om redan ansökt
+    existing = Interest.query.filter_by(user_id=user_id, shift_id=shift_id).first()
+    if not existing:
+        interest = Interest(user_id=user_id, shift_id=shift_id)
+        db.session.add(interest)
+        
+        # Logga det
+        u = User.query.get(user_id)
+        s = Shift.query.get(shift_id)
+        add_log(f"Intresseanmälan: {u.name} vill ha passet {s.date} på {s.unit.name}")
+        
+        db.session.commit()
+        flash("Din intresseanmälan är registrerad!", "success")
+        
+    return redirect(url_for('my_view', user_id=user_id))
+    
     app.run(debug=True)
