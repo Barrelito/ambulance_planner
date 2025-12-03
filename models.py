@@ -12,10 +12,7 @@ class Unit(db.Model):
     station_id = db.Column(db.Integer, db.ForeignKey('station.id'), nullable=False)
     requires_sits = db.Column(db.Boolean, default=False)
     is_flex = db.Column(db.Boolean, default=False)
-    
-    # VIKTIGT: Detta fält måste finnas!
-    requires_c1 = db.Column(db.Boolean, default=False) 
-
+    requires_c1 = db.Column(db.Boolean, default=False) # <--- VIKTIG
     day_time = db.Column(db.String(20), default="07:00-19:00")
     mid_time = db.Column(db.String(20), default="")
     night_time = db.Column(db.String(20), default="19:00-07:00") 
@@ -25,10 +22,7 @@ class User(db.Model):
     name = db.Column(db.String(100), nullable=False)
     role = db.Column(db.String(20)) 
     has_sits = db.Column(db.Boolean, default=False)
-    
-    # VIKTIGT: Detta fält måste finnas!
-    has_c1 = db.Column(db.Boolean, default=False)
-    
+    has_c1 = db.Column(db.Boolean, default=False) # <--- VIKTIG
     home_station = db.Column(db.String(50), default="Pool") 
 
 class Shift(db.Model):
@@ -39,7 +33,6 @@ class Shift(db.Model):
     amb_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
     vub_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
     comment = db.Column(db.String(250), nullable=True)
-    
     amb = db.relationship('User', foreign_keys=[amb_id])
     vub = db.relationship('User', foreign_keys=[vub_id])
     unit = db.relationship('Unit')
@@ -54,6 +47,5 @@ class Interest(db.Model):
     shift_id = db.Column(db.Integer, db.ForeignKey('shift.id'), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     timestamp = db.Column(db.DateTime, default=datetime.now)
-    
     shift = db.relationship('Shift')
     user = db.relationship('User')
