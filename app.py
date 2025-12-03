@@ -278,7 +278,7 @@ def generate_schedule():
     add_log(f"Schemaläggaren: Genererade schema för {user.name} på {unit.name}")
     db.session.commit()
     flash(f"Schema genererat för {total_weeks} veckor!", "success")
-    return redirect(url_for('dashboard'))
+    return redirect(url_for('scheduler'))
 
 # --- MIN VY & GNETA ---
 @app.route('/my_view', methods=['GET'])

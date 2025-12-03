@@ -11,8 +11,6 @@
         .day-col { flex: 1; text-align: center; }
         .day-header { font-size: 0.7em; font-weight: bold; text-transform: uppercase; color: #666; }
         .grid-row:nth-child(even) { background-color: #f9f9f9; border-radius: 4px; }
-        
-        /* Markera input-fältet när man fokuserar */
         .highlight-input { border: 2px solid #0d6efd; box-shadow: 0 0 5px rgba(13,110,253,0.5); }
     </style>
 </head>
@@ -26,6 +24,18 @@
 </nav>
 
 <div class="container pb-5">
+    
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
     <div class="card shadow">
         <div class="card-body">
             
@@ -81,7 +91,6 @@
 
                 <div class="d-flex justify-content-between align-items-center mb-3">
                     <h5 class="m-0">5. Bygg schemat</h5>
-                    
                     <div class="btn-group">
                         <button type="button" class="btn btn-outline-primary btn-sm" onclick="setRolling()">🔄 Rullande schema</button>
                         <button type="button" class="btn btn-outline-dark btn-sm" onclick="setWish()">📝 Önskeschema (Hela perioden)</button>
@@ -89,15 +98,11 @@
                 </div>
 
                 <div class="row mb-3 align-items-center bg-light p-2 rounded border">
-                    <div class="col-auto">
-                        <label class="fw-bold">Antal veckor i cykeln:</label>
-                    </div>
+                    <div class="col-auto"><label class="fw-bold">Antal veckor i cykeln:</label></div>
                     <div class="col-auto">
                         <input type="number" id="cycleWeeks" name="cycle_weeks" class="form-control fw-bold text-center" value="5" min="1" max="52" style="width: 80px;" onchange="buildGrid()">
                     </div>
-                    <div class="col-auto">
-                        <span class="text-muted small" id="cycleHelpText">Systemet repeterar dessa veckor tills perioden är slut.</span>
-                    </div>
+                    <div class="col-auto"><span class="text-muted small" id="cycleHelpText">Systemet repeterar dessa veckor tills perioden är slut.</span></div>
                 </div>
 
                 <div class="p-3 border rounded mb-4" style="background-color: #fff;">
@@ -121,23 +126,21 @@
     </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
 <script>
     function setRolling() {
         const input = document.getElementById('cycleWeeks');
-        input.value = 5; // Sätter standard, men man får ändra
-        document.getElementById('cycleHelpText').innerText = "Systemet repeterar dessa veckor tills perioden är slut. (Ändra siffran om schemat rullar på annat antal veckor).";
-        
-        // Markera fältet så man fattar att man kan ändra
-        input.focus();
-        input.select();
-        
+        input.value = 5; 
+        document.getElementById('cycleHelpText').innerText = "Systemet repeterar dessa veckor tills perioden är slut.";
+        input.focus(); input.select();
         buildGrid();
     }
 
     function setWish() {
         var total = document.getElementById('totalWeeks').value;
         document.getElementById('cycleWeeks').value = total;
-        document.getElementById('cycleHelpText').innerText = "Du fyller i hela perioden manuellt (inget repeteras).";
+        document.getElementById('cycleHelpText').innerText = "Du fyller i hela perioden manuellt.";
         buildGrid();
     }
 
@@ -206,7 +209,6 @@
         }
     }
     
-    // Kör vid start
     buildGrid();
 </script>
 
