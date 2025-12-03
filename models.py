@@ -36,8 +36,17 @@ class Shift(db.Model):
     vub = db.relationship('User', foreign_keys=[vub_id])
     unit = db.relationship('Unit')
 
-# --- NY TABELL: HÄNDELSELOGG ---
 class AuditLog(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    timestamp = db.Column(db.DateTime, default=datetime.now) # När hände det?
-    action = db.Column(db.String(500), nullable=False)       # Vad hände?
+    timestamp = db.Column(db.DateTime, default=datetime.now)
+    action = db.Column(db.String(500), nullable=False)
+
+# --- NY TABELL: INTRESSEANMÄLAN (GNETA) ---
+class Interest(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    shift_id = db.Column(db.Integer, db.ForeignKey('shift.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    timestamp = db.Column(db.DateTime, default=datetime.now)
+    
+    shift = db.relationship('Shift')
+    user = db.relationship('User')
