@@ -21,6 +21,9 @@
         .dot-red { background-color: #dc3545; }
         .time-label { font-size: 0.7em; color: #6c757d; display: block; margin-bottom: 4px; border-bottom: 1px solid #e9ecef; }
         .shift-disabled { background-color: #e9ecef; border: 1px solid #dee2e6; cursor: default; opacity: 0.6; }
+        
+        /* Kommentar-ikon */
+        .comment-icon { position: absolute; top: 2px; right: 5px; font-size: 1.2em; }
     </style>
 </head>
 <body class="bg-light">
@@ -41,16 +44,13 @@
                 <a href="/admin" class="btn btn-secondary btn-sm">🔧 Teknisk Admin</a>
             </div>
         </div>
-        
         <form action="/" method="GET" class="d-flex justify-content-between align-items-center bg-light p-2 rounded border">
             <a href="/" class="btn btn-success fw-bold me-3">📅 IDAG</a>
-
             <div class="d-flex align-items-center flex-grow-1 justify-content-center">
                 <a href="/?date={{ prev_date }}" class="btn btn-outline-dark fw-bold">‹ Föregående dag</a>
                 <input type="date" name="date" class="form-control w-auto mx-2" value="{{ current_date }}" onchange="this.form.submit()">
                 <a href="/?date={{ next_date }}" class="btn btn-outline-dark fw-bold">Nästa dag ›</a>
             </div>
-            
             <div style="width: 80px;"></div>
         </form>
     </div>
@@ -94,6 +94,8 @@
                             {% set is_active = 'blankpass-active' if (shift and (shift.amb or shift.vub)) else '' %}
                             {% set person_id = amb_val if amb_val else vub_val %}
                             {% set person_name = shift.amb.name if shift.amb else (shift.vub.name if shift.vub else '') %}
+                            
+                            {% set comment = shift.comment if shift and shift.comment else '' %}
 
                             <div class="col-md-3 col-6">
                                 <div class="blankpass-box {{ is_active }}"
@@ -103,10 +105,13 @@
                                      data-period="Dag"
                                      data-amb="{{ amb_val }}"
                                      data-vub="{{ vub_val }}"
+                                     data-comment="{{ comment }}"  
                                      data-requires-sits="False"
                                      data-person-id="{{ person_id }}"
                                      data-person-name="{{ person_name }}">
                                     
+                                    {% if comment %} <span class="comment-icon" title="{{ comment }}">💬</span> {% endif %}
+
                                     <div class="fw-bold text-muted small mb-1">{{ unit.name }}</div>
                                     {% if shift and (shift.amb or shift.vub) %}
                                         <div class="fw-bold text-dark">{{ person_name }}</div>
@@ -140,11 +145,17 @@
                                     {% set amb_val = shift.amb_id if shift and shift.amb_id else '' %}
                                     {% set vub_val = shift.vub_id if shift and shift.vub_id else '' %}
                                     
+                                    {% set comment = shift.comment if shift and shift.comment else '' %}
+
                                     <div class="shift-box {{ 'shift-warning' if warning else '' }}" 
                                          onclick="openModal(this)"
                                          data-unit-id="{{ unit.id }}" data-unit-name="{{ unit.name }}" data-period="{{ p }}"
                                          data-amb="{{ amb_val }}" data-vub="{{ vub_val }}"
+                                         data-comment="{{ comment }}"
                                          data-requires-sits="{{ unit.requires_sits }}">
+                                         
+                                         {% if comment %} <span class="comment-icon" title="{{ comment }}">💬</span> {% endif %}
+
                                          <span class="time-label">{{ t_tid }}</span>
                                         {% if shift and (shift.amb or shift.vub) %}
                                             <div class="fw-bold text-primary">{{ shift.amb.name if shift.amb else '-' }}</div>
@@ -180,7 +191,6 @@
                     <h5 class="modal-title">Bemanna <span id="modalUnitName"></span> (<span id="modalPeriod"></span>)</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
-
                 <div class="modal-body">
                     <input type="hidden" name="date" value="{{ current_date }}">
                     <input type="hidden" name="unit_id" id="inputUnitId">
@@ -239,6 +249,11 @@
                         </select>
                     </div>
 
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-muted">💬 Kommentar / Notering</label>
+                        <textarea name="comment" id="inputComment" class="form-control" rows="2" placeholder="T.ex. Student medåker, Bilen på verkstad..."></textarea>
+                    </div>
+
                     <div id="sitsWarning" class="alert alert-warning d-none mt-3">⚠️ <strong>SITS-VARNING:</strong> Denna bil kräver SITS.</div>
                     <div id="doubleBookingWarning" class="alert alert-danger d-none mt-3">🛑 <strong>KROCK:</strong> <span id="doubleBookingText"></span></div>
                     <div id="moveInfo" class="alert alert-success d-none mt-3">♻️ <strong>Flyttas:</strong> <span id="moveInfoText"></span> från sin resursplats.</div>
@@ -257,13 +272,12 @@
         <div class="modal-content">
             <form action="/move_staff" method="POST">
                 <div class="modal-header bg-success text-white">
-                    <h5 class="modal-title">♻️ Hantera Resurs</h5>
+                    <h5 class="modal-title">♻️ Flytta Resurs</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
                     <input type="hidden" name="date" value="{{ current_date }}">
                     <input type="hidden" name="person_id" id="movePersonId">
-                    
                     <h5 class="text-center mb-4">Vad vill du göra med <span id="movePersonName" class="fw-bold"></span>?</h5>
                     
                     <div class="card p-3 mb-3 border-success bg-light">
@@ -279,7 +293,6 @@
                         <p class="small text-muted mb-2">Använd detta om personen ska jobba en annan dag, eller är sjuk/ledig.</p>
                         <button type="submit" name="action" value="delete" class="btn btn-outline-danger w-100">❌ Ta bort från passet</button>
                     </div>
-
                 </div>
             </form>
         </div>
@@ -307,6 +320,7 @@
         var period = element.getAttribute('data-period');
         var ambId = element.getAttribute('data-amb');
         var vubId = element.getAttribute('data-vub');
+        var comment = element.getAttribute('data-comment'); // Hämta kommentar
         var personId = element.getAttribute('data-person-id');
         var personName = element.getAttribute('data-person-name');
         var requiresSits = element.getAttribute('data-requires-sits');
@@ -325,8 +339,10 @@
         document.getElementById('inputUnitId').value = unitId;
         document.getElementById('inputPeriod').value = period;
         document.getElementById('unitRequiresSits').value = requiresSits;
+        
         document.getElementById('selectAmb').value = ambId;
         document.getElementById('selectVub').value = vubId;
+        document.getElementById('inputComment').value = comment; // Fyll i kommentar
 
         if (unitName.includes("Plats")) {
             document.getElementById('vubContainer').style.display = 'none';

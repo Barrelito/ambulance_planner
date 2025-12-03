@@ -68,10 +68,16 @@ def update_shift():
     target_date = request.form.get('date') 
     unit_id = request.form.get('unit_id')
     period = request.form.get('period')
+    
     new_amb_id = int(request.form.get('amb_id')) if request.form.get('amb_id') else None
     new_vub_id = int(request.form.get('vub_id')) if request.form.get('vub_id') else None
+    
+    # Hämta kommentaren från formuläret
+    new_comment = request.form.get('comment')
+
     unit = Unit.query.get(unit_id)
     station_anchor = f"station-{unit.station.id}" if unit else ""
+
     def clear_from_blankpass(user_id):
         if not user_id: return
         user_shifts = Shift.query.filter_by(date=target_date, period=period).all()
@@ -79,11 +85,21 @@ def update_shift():
             if 'BLANKPASS' in s.unit.station.name:
                 if s.amb_id == user_id: s.amb_id = None
                 if s.vub_id == user_id: s.vub_id = None
-    clear_from_blankpass(new_amb_id); clear_from_blankpass(new_vub_id)
+
+    clear_from_blankpass(new_amb_id)
+    clear_from_blankpass(new_vub_id)
+
     shift = Shift.query.filter_by(date=target_date, unit_id=unit_id, period=period).first()
-    if not shift: shift = Shift(date=target_date, unit_id=unit_id, period=period); db.session.add(shift)
-    shift.amb_id = new_amb_id; shift.vub_id = new_vub_id
+    if not shift:
+        shift = Shift(date=target_date, unit_id=unit_id, period=period)
+        db.session.add(shift)
+
+    shift.amb_id = new_amb_id
+    shift.vub_id = new_vub_id
+    shift.comment = new_comment # <--- SPARA KOMMENTAREN
+    
     db.session.commit()
+    
     return redirect(url_for('index', date=target_date, _anchor=station_anchor))
 
 @app.route('/move_staff', methods=['POST'])
