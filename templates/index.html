@@ -180,6 +180,7 @@
                     <h5 class="modal-title">Bemanna <span id="modalUnitName"></span> (<span id="modalPeriod"></span>)</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
+
                 <div class="modal-body">
                     <input type="hidden" name="date" value="{{ current_date }}">
                     <input type="hidden" name="unit_id" id="inputUnitId">
@@ -256,24 +257,29 @@
         <div class="modal-content">
             <form action="/move_staff" method="POST">
                 <div class="modal-header bg-success text-white">
-                    <h5 class="modal-title">♻️ Flytta Resurs</h5>
+                    <h5 class="modal-title">♻️ Hantera Resurs</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
                     <input type="hidden" name="date" value="{{ current_date }}">
                     <input type="hidden" name="person_id" id="movePersonId">
-                    <h5 class="text-center mb-4">Flytta <span id="movePersonName" class="fw-bold"></span> till:</h5>
-                    <div class="mb-3">
-                        <label class="form-label text-muted">Välj vakant bil:</label>
-                        <select class="form-select form-select-lg" name="target_spot" id="moveTargetSpot" required>
+                    
+                    <h5 class="text-center mb-4">Vad vill du göra med <span id="movePersonName" class="fw-bold"></span>?</h5>
+                    
+                    <div class="card p-3 mb-3 border-success bg-light">
+                        <label class="form-label fw-bold text-success">Alternativ A: Flytta till vakant bil (Idag)</label>
+                        <select class="form-select form-select-lg mb-2" name="target_spot" id="moveTargetSpot">
                             <option value="">-- Välj i listan --</option>
                         </select>
+                        <button type="submit" name="action" value="move" class="btn btn-success w-100">✅ Bekräfta Flytt</button>
                     </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-outline-danger me-auto" onclick="document.getElementById('editModal').show()">❌ Ta bort / Ändra</button>
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Avbryt</button>
-                    <button type="submit" class="btn btn-success">Bekräfta Flytt</button>
+
+                    <div class="card p-3 border-danger bg-light">
+                        <label class="form-label fw-bold text-danger">Alternativ B: Ta bort från schemat</label>
+                        <p class="small text-muted mb-2">Använd detta om personen ska jobba en annan dag, eller är sjuk/ledig.</p>
+                        <button type="submit" name="action" value="delete" class="btn btn-outline-danger w-100">❌ Ta bort från passet</button>
+                    </div>
+
                 </div>
             </form>
         </div>

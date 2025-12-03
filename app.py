@@ -90,22 +90,51 @@ def update_shift():
 def move_staff():
     date_str = request.form.get('date')
     person_id = int(request.form.get('person_id'))
-    target_value = request.form.get('target_spot') 
-    if not target_value: return redirect(url_for('index', date=date_str))
-    target_unit_id, target_period = target_value.split('|')
-    target_unit_id = int(target_unit_id)
+    action = request.form.get('action') # "move" eller "delete"
+    
+    # 1. Ta alltid bort personen från det gamla passet (Blankpasset)
     old_shifts = Shift.query.filter_by(date=date_str).all()
+    station_anchor = ""
+    
     for s in old_shifts:
-        if s.amb_id == person_id: s.amb_id = None
-        if s.vub_id == person_id: s.vub_id = None
-    shift = Shift.query.filter_by(date=date_str, unit_id=target_unit_id, period=target_period).first()
-    if not shift: shift = Shift(date=date_str, unit_id=target_unit_id, period=target_period); db.session.add(shift)
-    if not shift.amb_id: shift.amb_id = person_id
-    elif not shift.vub_id: shift.vub_id = person_id
-    else: flash("Bilen var tyvärr full.", "warning")
+        if s.amb_id == person_id: 
+            s.amb_id = None
+            # Spara station-id för att scrolla tillbaka dit om vi bara tar bort
+            if 'BLANKPASS' in s.unit.station.name:
+                station_anchor = f"station-{s.unit.station.id}"
+        
+        if s.vub_id == person_id: 
+            s.vub_id = None
+            if 'BLANKPASS' in s.unit.station.name:
+                station_anchor = f"station-{s.unit.station.id}"
+
+    # 2. Om vi valde "Flytta" -> Lägg till på nya bilen
+    if action == 'move':
+        target_value = request.form.get('target_spot')
+        if target_value:
+            target_unit_id, target_period = target_value.split('|')
+            target_unit_id = int(target_unit_id)
+            
+            shift = Shift.query.filter_by(date=date_str, unit_id=target_unit_id, period=target_period).first()
+            if not shift:
+                shift = Shift(date=date_str, unit_id=target_unit_id, period=target_period)
+                db.session.add(shift)
+            
+            if not shift.amb_id: shift.amb_id = person_id
+            elif not shift.vub_id: shift.vub_id = person_id
+            else: flash("Bilen var tyvärr full.", "warning")
+            
+            # Uppdatera scroll-ankare till den nya bilen
+            unit = Unit.query.get(target_unit_id)
+            station_anchor = f"station-{unit.station.id}"
+
     db.session.commit()
-    unit = Unit.query.get(target_unit_id)
-    return redirect(url_for('index', date=date_str, _anchor=f"station-{unit.station.id}"))
+    
+    # 3. Om vi valde "delete", ge feedback
+    if action == 'delete':
+        flash("Personen har tagits bort från passet.", "info")
+
+    return redirect(url_for('index', date=date_str, _anchor=station_anchor))
 
 # --- SCHEMALÄGGAREN ---
 @app.route('/scheduler')
