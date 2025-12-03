@@ -47,15 +47,12 @@ def logout():
     return redirect(url_for('login'))
 
 # --- HUVUDSIDAN (PLANERING) ---
+# --- UPPDATERAD INDEX-FUNKTION (HÄMTA INTRESSEN) ---
 @app.route('/')
 def index():
     selected_date_str = request.args.get('date') or date.today().strftime('%Y-%m-%d')
-    try:
-        selected_date = datetime.strptime(selected_date_str, '%Y-%m-%d').date()
-    except:
-        selected_date = date.today()
-        selected_date_str = selected_date.strftime('%Y-%m-%d')
-
+    try: selected_date = datetime.strptime(selected_date_str, '%Y-%m-%d').date()
+    except: selected_date = date.today(); selected_date_str = selected_date.strftime('%Y-%m-%d')
     prev_date = (selected_date - timedelta(days=1)).strftime('%Y-%m-%d')
     next_date = (selected_date + timedelta(days=1)).strftime('%Y-%m-%d')
 
@@ -65,10 +62,13 @@ def index():
 
     shift_map = {}
     busy_users = {}
+    
+    # NYTT: Karta för intresseanmälningar
+    # Format: interest_map[shift_id] = "Id:Namn:Roll, Id:Namn:Roll"
+    interest_map = {} 
 
     for shift in shifts:
-        if shift.unit_id not in shift_map:
-            shift_map[shift.unit_id] = {}
+        if shift.unit_id not in shift_map: shift_map[shift.unit_id] = {}
         shift_map[shift.unit_id][shift.period] = shift
 
         if shift.amb_id:
@@ -77,24 +77,27 @@ def index():
         if shift.vub_id:
             if shift.vub_id not in busy_users: busy_users[shift.vub_id] = {}
             busy_users[shift.vub_id][shift.period] = shift.unit.name
-    
-    # Hitta vakanser för IDAG (för flytt-listan i modalen)
+            
+        # Hämta intresseanmälningar för detta pass
+        interests = Interest.query.filter_by(shift_id=shift.id).all()
+        if interests:
+            # Bygg en sträng som vi kan skicka till HTML: "12:Sven:VUB, 45:Anna:AMB"
+            applicants = []
+            for i in interests:
+                applicants.append(f"{i.user.id}:{i.user.name}:{i.user.role}")
+            interest_map[shift.id] = "|".join(applicants)
+
+    # (Vakanslistan för flytt-modalen - oförändrad)
     vacant_spots = []
     all_units = Unit.query.all()
     for unit in all_units:
         if 'BLANKPASS' in unit.station.name: continue
-        
-        # Dag
         s_dag = shift_map.get(unit.id, {}).get('Dag')
         if not s_dag or not s_dag.amb_id or not s_dag.vub_id:
             vacant_spots.append({'id': unit.id, 'name': unit.name, 'period': 'Dag', 'station': unit.station.name})
-        
-        # Natt
         s_natt = shift_map.get(unit.id, {}).get('Natt')
         if not s_natt or not s_natt.amb_id or not s_natt.vub_id:
             vacant_spots.append({'id': unit.id, 'name': unit.name, 'period': 'Natt', 'station': unit.station.name})
-            
-        # Mellan
         if unit.mid_time:
             s_mid = shift_map.get(unit.id, {}).get('Mellan')
             if not s_mid or not s_mid.amb_id or not s_mid.vub_id:
@@ -102,6 +105,7 @@ def index():
 
     return render_template('index.html', 
                            stations=all_stations, shift_map=shift_map, users=all_users, busy_users=busy_users, 
+                           interest_map=interest_map, # <-- SKICKA MED DENNA
                            current_date=selected_date_str, prev_date=prev_date, next_date=next_date, vacant_spots=vacant_spots)
 
 # --- SPARA/UPPDATERA PASS ---
@@ -373,7 +377,7 @@ def apply_interest():
         
     return redirect(url_for('my_view', user_id=user_id))
 
-# --- DASHBOARD & ADMIN ---
+# --- UPPDATERAD DASHBOARD (RÄKNA INTRESSEN) ---
 @app.route('/dashboard')
 def dashboard():
     users = User.query.order_by(User.home_station, User.name).all()
@@ -399,7 +403,12 @@ def dashboard():
     start_str = start_date.strftime('%Y-%m-%d'); end_str = end_date.strftime('%Y-%m-%d')
     existing_shifts = Shift.query.filter(Shift.date >= start_str, Shift.date <= end_str).all()
     shift_map = {}
-    for s in existing_shifts: shift_map[(s.date, s.unit_id, s.period)] = s
+    
+    # Spara även antalet intressen i kartan
+    # structure: shift_map[(date, unit, period)] = {shift_obj, interest_count}
+    for s in existing_shifts:
+        count = Interest.query.filter_by(shift_id=s.id).count()
+        shift_map[(s.date, s.unit_id, s.period)] = {'obj': s, 'interest_count': count}
 
     if sel_station_id > 0:
         all_units = Unit.query.filter_by(station_id=sel_station_id).all()
@@ -418,7 +427,11 @@ def dashboard():
             if unit.mid_time: periods.append('Mellan')
             for p in periods:
                 total_potential_shifts += 1
-                shift = shift_map.get((d_str, unit.id, p))
+                data = shift_map.get((d_str, unit.id, p))
+                
+                shift = data['obj'] if data else None
+                interest_count = data['interest_count'] if data else 0
+                
                 missing = []
                 if not shift: missing = ["AMB", "VUB"]
                 else:
@@ -426,7 +439,15 @@ def dashboard():
                     if not shift.vub_id: missing.append("VUB")
                 if missing:
                     tid = unit.day_time if p == 'Dag' else (unit.night_time if p == 'Natt' else unit.mid_time)
-                    vacancies.append({'date': d_str, 'station': unit.station.name, 'unit': unit.name, 'period': p, 'time': tid, 'missing': ", ".join(missing)})
+                    vacancies.append({
+                        'date': d_str, 
+                        'station': unit.station.name, 
+                        'unit': unit.name, 
+                        'period': p, 
+                        'time': tid, 
+                        'missing': ", ".join(missing),
+                        'applicants': interest_count # <-- NYTT: Antal sökande
+                    })
                 else: filled_shifts += 1
     
     fill_rate = int((filled_shifts / total_potential_shifts * 100)) if total_potential_shifts > 0 else 0

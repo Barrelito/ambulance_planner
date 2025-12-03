@@ -21,9 +21,8 @@
         .dot-red { background-color: #dc3545; }
         .time-label { font-size: 0.7em; color: #6c757d; display: block; margin-bottom: 4px; border-bottom: 1px solid #e9ecef; }
         .shift-disabled { background-color: #e9ecef; border: 1px solid #dee2e6; cursor: default; opacity: 0.6; }
-        
-        /* Kommentar-ikon */
         .comment-icon { position: absolute; top: 2px; right: 5px; font-size: 1.2em; }
+        .interest-icon { position: absolute; top: 2px; left: 5px; font-size: 1.0em; text-shadow: 0 0 3px yellow; }
     </style>
 </head>
 <body class="bg-light">
@@ -42,7 +41,6 @@
             <div class="d-flex gap-2">
                 <a href="/dashboard" class="btn btn-primary btn-sm">📊 Samordnare</a>
                 <a href="/admin" class="btn btn-secondary btn-sm">🔧 Teknisk Admin</a>
-                <a href="/my_view" class="btn btn-info btn-sm">📱 Min Sida</a>
             </div>
         </div>
         <form action="/" method="GET" class="d-flex justify-content-between align-items-center bg-light p-2 rounded border">
@@ -95,7 +93,6 @@
                             {% set is_active = 'blankpass-active' if (shift and (shift.amb or shift.vub)) else '' %}
                             {% set person_id = amb_val if amb_val else vub_val %}
                             {% set person_name = shift.amb.name if shift.amb else (shift.vub.name if shift.vub else '') %}
-                            
                             {% set comment = shift.comment if shift and shift.comment else '' %}
 
                             <div class="col-md-3 col-6">
@@ -106,13 +103,12 @@
                                      data-period="Dag"
                                      data-amb="{{ amb_val }}"
                                      data-vub="{{ vub_val }}"
-                                     data-comment="{{ comment }}"  
+                                     data-comment="{{ comment }}"
                                      data-requires-sits="False"
                                      data-person-id="{{ person_id }}"
                                      data-person-name="{{ person_name }}">
                                     
                                     {% if comment %} <span class="comment-icon" title="{{ comment }}">💬</span> {% endif %}
-
                                     <div class="fw-bold text-muted small mb-1">{{ unit.name }}</div>
                                     {% if shift and (shift.amb or shift.vub) %}
                                         <div class="fw-bold text-dark">{{ person_name }}</div>
@@ -145,19 +141,18 @@
                                     {% endif %}
                                     {% set amb_val = shift.amb_id if shift and shift.amb_id else '' %}
                                     {% set vub_val = shift.vub_id if shift and shift.vub_id else '' %}
-                                    
                                     {% set comment = shift.comment if shift and shift.comment else '' %}
+                                    
+                                    {% set interests = interest_map.get(shift.id, '') if shift else '' %}
 
                                     <div class="shift-box {{ 'shift-warning' if warning else '' }}" 
                                          onclick="openModal(this)"
                                          data-unit-id="{{ unit.id }}" data-unit-name="{{ unit.name }}" data-period="{{ p }}"
                                          data-amb="{{ amb_val }}" data-vub="{{ vub_val }}"
                                          data-comment="{{ comment }}"
-                                         data-requires-sits="{{ unit.requires_sits }}">
-                                         
-                                         {% if comment %} <span class="comment-icon" title="{{ comment }}">💬</span> {% endif %}
-
-                                         <span class="time-label">{{ t_tid }}</span>
+                                         data-requires-sits="{{ unit.requires_sits }}"
+                                         data-interests="{{ interests }}"> {% if comment %} <span class="comment-icon" title="{{ comment }}">💬</span> {% endif %}
+                                         {% if interests %} <span class="interest-icon">🌟</span> {% endif %} <span class="time-label">{{ t_tid }}</span>
                                         {% if shift and (shift.amb or shift.vub) %}
                                             <div class="fw-bold text-primary">{{ shift.amb.name if shift.amb else '-' }}</div>
                                             <div class="fw-bold text-success">{{ shift.vub.name if shift.vub else '-' }}</div>
@@ -181,7 +176,7 @@
 </div>
 
 <div class="text-center py-4 border-top mt-5">
-    <a href="/logout" class="text-danger text-decoration-none small">Logga ut (Lås systemet)</a>
+    <a href="/logout" class="text-danger text-decoration-none small">Logga ut</a>
 </div>
 
 <div class="modal fade" id="editModal" tabindex="-1">
@@ -197,6 +192,12 @@
                     <input type="hidden" name="unit_id" id="inputUnitId">
                     <input type="hidden" name="period" id="inputPeriod">
                     <input type="hidden" id="unitRequiresSits">
+
+                    <div id="applicantSection" class="mb-3 d-none">
+                        <label class="form-label fw-bold text-dark">🌟 Intresseanmälningar (Gnet)</label>
+                        <div class="list-group mb-2" id="applicantList">
+                            </div>
+                    </div>
 
                     <div class="mb-3">
                         <label class="form-label fw-bold text-primary" id="labelAmb">AMB</label>
@@ -251,8 +252,8 @@
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label fw-bold text-muted">💬 Kommentar / Notering</label>
-                        <textarea name="comment" id="inputComment" class="form-control" rows="2" placeholder="T.ex. Student medåker, Bilen på verkstad..."></textarea>
+                        <label class="form-label fw-bold text-muted">💬 Kommentar</label>
+                        <textarea name="comment" id="inputComment" class="form-control" rows="2"></textarea>
                     </div>
 
                     <div id="sitsWarning" class="alert alert-warning d-none mt-3">⚠️ <strong>SITS-VARNING:</strong> Denna bil kräver SITS.</div>
@@ -280,18 +281,13 @@
                     <input type="hidden" name="date" value="{{ current_date }}">
                     <input type="hidden" name="person_id" id="movePersonId">
                     <h5 class="text-center mb-4">Vad vill du göra med <span id="movePersonName" class="fw-bold"></span>?</h5>
-                    
                     <div class="card p-3 mb-3 border-success bg-light">
                         <label class="form-label fw-bold text-success">Alternativ A: Flytta till vakant bil (Idag)</label>
-                        <select class="form-select form-select-lg mb-2" name="target_spot" id="moveTargetSpot">
-                            <option value="">-- Välj i listan --</option>
-                        </select>
+                        <select class="form-select form-select-lg mb-2" name="target_spot" id="moveTargetSpot"><option value="">-- Välj i listan --</option></select>
                         <button type="submit" name="action" value="move" class="btn btn-success w-100">✅ Bekräfta Flytt</button>
                     </div>
-
                     <div class="card p-3 border-danger bg-light">
                         <label class="form-label fw-bold text-danger">Alternativ B: Ta bort från schemat</label>
-                        <p class="small text-muted mb-2">Använd detta om personen ska jobba en annan dag, eller är sjuk/ledig.</p>
                         <button type="submit" name="action" value="delete" class="btn btn-outline-danger w-100">❌ Ta bort från passet</button>
                     </div>
                 </div>
@@ -321,10 +317,13 @@
         var period = element.getAttribute('data-period');
         var ambId = element.getAttribute('data-amb');
         var vubId = element.getAttribute('data-vub');
-        var comment = element.getAttribute('data-comment'); // Hämta kommentar
+        var comment = element.getAttribute('data-comment'); 
         var personId = element.getAttribute('data-person-id');
         var personName = element.getAttribute('data-person-name');
         var requiresSits = element.getAttribute('data-requires-sits');
+        
+        // NYTT: Hämta intresseanmälningar
+        var interestsRaw = element.getAttribute('data-interests');
 
         if (unitName.includes("Plats") && personId) {
             document.getElementById('movePersonId').value = personId;
@@ -340,10 +339,45 @@
         document.getElementById('inputUnitId').value = unitId;
         document.getElementById('inputPeriod').value = period;
         document.getElementById('unitRequiresSits').value = requiresSits;
-        
         document.getElementById('selectAmb').value = ambId;
         document.getElementById('selectVub').value = vubId;
-        document.getElementById('inputComment').value = comment; // Fyll i kommentar
+        document.getElementById('inputComment').value = comment;
+
+        // HANTERA INTRESSELISTAN
+        var appList = document.getElementById('applicantList');
+        var appSection = document.getElementById('applicantSection');
+        appList.innerHTML = ''; // Rensa gamla
+
+        if (interestsRaw && interestsRaw.length > 0) {
+            appSection.classList.remove('d-none');
+            var applicants = interestsRaw.split('|');
+            applicants.forEach(function(app) {
+                // app = "ID:Namn:Roll"
+                var parts = app.split(':');
+                var uId = parts[0];
+                var uName = parts[1];
+                var uRole = parts[2];
+
+                var btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'list-group-item list-group-item-action d-flex justify-content-between align-items-center';
+                btn.innerHTML = `<span><strong>${uName}</strong> (${uRole})</span> <span class="badge bg-success rounded-pill">Välj</span>`;
+                
+                // När man klickar på personen, fyll i rätt dropdown
+                btn.onclick = function() {
+                    if (uRole === 'SSK' || uRole === 'AMB') {
+                        document.getElementById('selectAmb').value = uId;
+                    } else {
+                        document.getElementById('selectVub').value = uId;
+                    }
+                    checkWarnings(); // Uppdatera varningar
+                };
+                
+                appList.appendChild(btn);
+            });
+        } else {
+            appSection.classList.add('d-none');
+        }
 
         if (unitName.includes("Plats")) {
             document.getElementById('vubContainer').style.display = 'none';
