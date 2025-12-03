@@ -141,14 +141,16 @@
                                     {% set vub_val = shift.vub_id if shift and shift.vub_id else '' %}
                                     {% set comment = shift.comment if shift and shift.comment else '' %}
                                     {% set interests = interest_map.get(shift.id, '') if shift else '' %}
-                                    
                                     {% set is_full = shift.amb and shift.vub if shift else false %}
                                     {% set show_star = true if (interests and not is_full) else false %}
 
                                     <div class="shift-box {{ 'shift-warning' if warning else '' }}" 
                                          onclick="openModal(this)"
-                                         data-unit-id="{{ unit.id }}" data-unit-name="{{ unit.name }}" data-period="{{ p }}"
-                                         data-amb="{{ amb_val }}" data-vub="{{ vub_val }}"
+                                         data-unit-id="{{ unit.id }}" 
+                                         data-unit-name="{{ unit.name }}" 
+                                         data-period="{{ p }}"
+                                         data-amb="{{ amb_val }}" 
+                                         data-vub="{{ vub_val }}"
                                          data-comment="{{ comment }}"
                                          data-requires-sits="{{ unit.requires_sits }}"
                                          data-requires-c1="{{ unit.requires_c1 }}"
