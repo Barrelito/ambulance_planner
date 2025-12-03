@@ -4,6 +4,10 @@
     <meta charset="UTF-8">
     <title>Ambulansplanering</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" />
+
     <style>
         .unit-row { border-bottom: 1px solid #eee; padding: 10px 0; }
         .sits-badge { background-color: #ffc107; color: #000; font-weight: bold; font-size: 0.8em; padding: 2px 6px; border-radius: 4px; }
@@ -24,6 +28,9 @@
         .shift-disabled { background-color: #e9ecef; border: 1px solid #dee2e6; cursor: default; opacity: 0.6; }
         .comment-icon { position: absolute; top: 2px; right: 5px; font-size: 1.2em; }
         .interest-icon { position: absolute; top: 2px; left: 5px; font-size: 1.0em; text-shadow: 0 0 3px yellow; }
+        
+        /* Justering för Select2 i Bootstrap */
+        .select2-container--bootstrap-5 .select2-selection { border-color: #dee2e6; }
     </style>
 </head>
 <body class="bg-light">
@@ -160,7 +167,7 @@
                                         {% if shift and (shift.amb or shift.vub) %}
                                             <div class="fw-bold text-primary">{{ shift.amb.name if shift.amb else '-' }}</div>
                                             <div class="fw-bold text-success">{{ shift.vub.name if shift.vub else '-' }}</div>
-                                            {% if warning %}<div class="text-dark fw-bold small mt-1">⚠️ KOMPETENS</div>{% endif %}
+                                            {% if warning %}<div class="text-dark fw-bold small mt-1">⚠️ SAKNAS/FEL</div>{% endif %}
                                         {% else %} <small class="text-muted">Vakant</small> {% endif %}
                                     </div>
                                 {% else %}
@@ -202,8 +209,8 @@
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label fw-bold text-primary" id="labelAmb">AMB (Kör)</label>
-                        <select class="form-select" name="amb_id" id="selectAmb" onchange="checkWarnings()">
+                        <label class="form-label fw-bold text-primary" id="labelAmb">AMB</label>
+                        <select class="form-select" name="amb_id" id="selectAmb" style="width: 100%;">
                             <option value="" data-sits="False" data-c1="False" data-role="None">-- Ingen vald --</option>
                             {% for station_name, group in users|groupby('home_station') %}
                                 <optgroup label="{{ station_name }}">
@@ -238,7 +245,7 @@
 
                     <div class="mb-3" id="vubContainer">
                         <label class="form-label fw-bold text-success">VUB</label>
-                        <select class="form-select" name="vub_id" id="selectVub" onchange="checkWarnings()">
+                        <select class="form-select" name="vub_id" id="selectVub" style="width: 100%;">
                             <option value="" data-sits="False" data-c1="False" data-role="None">-- Ingen vald --</option>
                             {% for station_name, group in users|groupby('home_station') %}
                                 <optgroup label="{{ station_name }}">
@@ -287,10 +294,33 @@
 
 <div class="modal fade" id="moveModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content"><form action="/move_staff" method="POST"><div class="modal-header bg-success text-white"><h5 class="modal-title">♻️ Flytta Resurs</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><input type="hidden" name="date" value="{{ current_date }}"><input type="hidden" name="person_id" id="movePersonId"><h5 class="text-center mb-4">Vad vill du göra med <span id="movePersonName" class="fw-bold"></span>?</h5><div class="card p-3 mb-3 border-success bg-light"><label class="form-label fw-bold text-success">Alternativ A: Flytta till vakant bil (Idag)</label><select class="form-select form-select-lg mb-2" name="target_spot" id="moveTargetSpot"><option value="">-- Välj i listan --</option></select><button type="submit" name="action" value="move" class="btn btn-success w-100">✅ Bekräfta Flytt</button></div><div class="card p-3 border-danger bg-light"><label class="form-label fw-bold text-danger">Alternativ B: Ta bort från schemat</label><button type="submit" name="action" value="delete" class="btn btn-outline-danger w-100">❌ Ta bort från passet</button></div></div></form></div></div></div>
 
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
 <script>
     var editModal = new bootstrap.Modal(document.getElementById('editModal'));
     var moveModal = new bootstrap.Modal(document.getElementById('moveModal'));
+
+    // 1. INITIERA SELECT2 (SÖKBARA LISTOR)
+    $(document).ready(function() {
+        $('#selectAmb').select2({
+            dropdownParent: $('#editModal'),
+            theme: 'bootstrap-5',
+            placeholder: "-- Välj person --",
+            allowClear: true
+        });
+        $('#selectVub').select2({
+            dropdownParent: $('#editModal'),
+            theme: 'bootstrap-5',
+            placeholder: "-- Välj person --",
+            allowClear: true
+        });
+
+        // VIKTIGT: Koppla varning-checken till Select2:s "change"-event
+        $('#selectAmb').on('change', checkWarnings);
+        $('#selectVub').on('change', checkWarnings);
+    });
 
     document.addEventListener("DOMContentLoaded", function() {
         var collapses = document.querySelectorAll('.station-collapse');
@@ -330,9 +360,11 @@
         document.getElementById('inputPeriod').value = period;
         document.getElementById('unitRequiresSits').value = requiresSits;
         document.getElementById('unitRequiresC1').value = requiresC1; 
-        document.getElementById('selectAmb').value = ambId;
-        document.getElementById('selectVub').value = vubId;
         document.getElementById('inputComment').value = comment;
+
+        // UPPDATERA SELECT2 VÄRDEN (Måste använda jQuery .val().trigger('change'))
+        $('#selectAmb').val(ambId).trigger('change');
+        $('#selectVub').val(vubId).trigger('change');
 
         var appList = document.getElementById('applicantList');
         var appSection = document.getElementById('applicantSection');
@@ -348,9 +380,8 @@
                 btn.className = 'list-group-item list-group-item-action d-flex justify-content-between align-items-center';
                 btn.innerHTML = `<span><strong>${uName}</strong> (${uRole})</span> <span class="badge bg-success rounded-pill">Välj</span>`;
                 btn.onclick = function() {
-                    if (uRole === 'AMB' || uRole === 'SSK') { document.getElementById('selectAmb').value = uId; }
-                    else { document.getElementById('selectVub').value = uId; }
-                    checkWarnings();
+                    if (uRole === 'AMB' || uRole === 'SSK') { $('#selectAmb').val(uId).trigger('change'); }
+                    else { $('#selectVub').val(uId).trigger('change'); }
                 };
                 appList.appendChild(btn);
             });
@@ -363,7 +394,10 @@
             document.getElementById('vubContainer').style.display = 'block';
             document.getElementById('labelAmb').innerText = "AMB";
         }
-        checkWarnings(); editModal.show();
+        
+        // Vänte en millisekund så Select2 hinner rita upp sig
+        setTimeout(checkWarnings, 50);
+        editModal.show();
     }
 
     function checkWarnings() {
@@ -377,29 +411,32 @@
         var requiresSits = document.getElementById('unitRequiresSits').value === 'True';
         var requiresC1 = document.getElementById('unitRequiresC1').value === 'True';
         
-        var ambSelect = document.getElementById('selectAmb');
-        var vubSelect = document.getElementById('selectVub');
-        var ambOption = ambSelect.options[ambSelect.selectedIndex];
-        var vubOption = vubSelect.options[vubSelect.selectedIndex];
+        // Hämta värden från Select2 (jQuery) eller native om det strular
+        var ambId = $('#selectAmb').val();
+        var vubId = $('#selectVub').val();
+        
+        // Hitta selected options i DOM:en (Select2 döljer dem, men de är valda)
+        var ambOption = document.querySelector(`#selectAmb option[value='${ambId}']`);
+        var vubOption = document.querySelector(`#selectVub option[value='${vubId}']`);
 
         var showC1Warning = false;
-        if (requiresC1 && ambSelect.value !== "") {
-            var ambHasC1 = ambOption.getAttribute('data-c1') === 'True';
+        if (requiresC1 && ambId) {
+            var ambHasC1 = ambOption ? ambOption.getAttribute('data-c1') === 'True' : false;
             if (!ambHasC1) showC1Warning = true;
         }
         if (showC1Warning) document.getElementById('c1Warning').classList.remove('d-none');
         else document.getElementById('c1Warning').classList.add('d-none');
 
         var showRoleWarning = false;
-        if (ambSelect.value !== "" && ambOption.getAttribute('data-role') === 'VUB') showRoleWarning = true;
-        if (vubSelect.value !== "" && vubOption.getAttribute('data-role') === 'AMB') showRoleWarning = true;
+        if (ambId && ambOption && ambOption.getAttribute('data-role') === 'VUB') showRoleWarning = true;
+        if (vubId && vubOption && vubOption.getAttribute('data-role') === 'AMB') showRoleWarning = true;
         if (showRoleWarning) document.getElementById('roleWarning').classList.remove('d-none');
         else document.getElementById('roleWarning').classList.add('d-none');
 
         var showSitsWarning = false;
         if (requiresSits) {
-            if (ambSelect.value !== "" && ambOption.getAttribute('data-sits') !== 'True') showSitsWarning = true;
-            if (vubSelect.value !== "" && vubOption.getAttribute('data-sits') !== 'True') showSitsWarning = true;
+            if (ambId && ambOption && ambOption.getAttribute('data-sits') !== 'True') showSitsWarning = true;
+            if (vubId && vubOption && vubOption.getAttribute('data-sits') !== 'True') showSitsWarning = true;
         }
         if (showSitsWarning) document.getElementById('sitsWarning').classList.remove('d-none'); 
         else document.getElementById('sitsWarning').classList.add('d-none');
@@ -414,14 +451,16 @@
         var moveText = document.getElementById('moveInfoText');
         var currentPeriod = document.getElementById('inputPeriod').value; 
         var currentUnitName = document.getElementById('modalUnitName').innerText;
-        var ambSelect = document.getElementById('selectAmb');
-        var vubSelect = document.getElementById('selectVub');
-        var ambOption = ambSelect.options[ambSelect.selectedIndex];
-        var vubOption = vubSelect.options[vubSelect.selectedIndex];
+        
+        var ambId = $('#selectAmb').val();
+        var vubId = $('#selectVub').val();
+        var ambOption = document.querySelector(`#selectAmb option[value='${ambId}']`);
+        var vubOption = document.querySelector(`#selectVub option[value='${vubId}']`);
+
         var conflicts = []; var moves = [];
 
         function checkOption(option) {
-            if (option.value !== "") {
+            if (option) {
                 var busyUnit = option.getAttribute('data-busy-' + currentPeriod.toLowerCase());
                 if (busyUnit && busyUnit !== currentUnitName) {
                     if (busyUnit.includes("Plats")) moves.push(option.text.trim().split(' ')[0] + " (från " + busyUnit + ")");
@@ -429,7 +468,9 @@
                 }
             }
         }
-        checkOption(ambOption); checkOption(vubOption);
+        if(ambId) checkOption(ambOption); 
+        if(vubId) checkOption(vubOption);
+
         if (conflicts.length > 0) { warningText.innerText = conflicts.join(', '); warningBox.classList.remove('d-none'); } else warningBox.classList.add('d-none');
         if (moves.length > 0) { moveText.innerText = moves.join(', '); moveBox.classList.remove('d-none'); } else moveBox.classList.add('d-none');
     }
