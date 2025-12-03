@@ -146,11 +146,8 @@
 
                                     <div class="shift-box {{ 'shift-warning' if warning else '' }}" 
                                          onclick="openModal(this)"
-                                         data-unit-id="{{ unit.id }}" 
-                                         data-unit-name="{{ unit.name }}" 
-                                         data-period="{{ p }}"
-                                         data-amb="{{ amb_val }}" 
-                                         data-vub="{{ vub_val }}"
+                                         data-unit-id="{{ unit.id }}" data-unit-name="{{ unit.name }}" data-period="{{ p }}"
+                                         data-amb="{{ amb_val }}" data-vub="{{ vub_val }}"
                                          data-comment="{{ comment }}"
                                          data-requires-sits="{{ unit.requires_sits }}"
                                          data-requires-c1="{{ unit.requires_c1 }}"
@@ -163,7 +160,7 @@
                                         {% if shift and (shift.amb or shift.vub) %}
                                             <div class="fw-bold text-primary">{{ shift.amb.name if shift.amb else '-' }}</div>
                                             <div class="fw-bold text-success">{{ shift.vub.name if shift.vub else '-' }}</div>
-                                            {% if warning %}<div class="text-dark fw-bold small mt-1">⚠️ SAKNAS/FEL</div>{% endif %}
+                                            {% if warning %}<div class="text-dark fw-bold small mt-1">⚠️ KOMPETENS</div>{% endif %}
                                         {% else %} <small class="text-muted">Vakant</small> {% endif %}
                                     </div>
                                 {% else %}
@@ -189,7 +186,7 @@
         <div class="modal-content">
             <form action="/update_shift" method="POST">
                 <div class="modal-header">
-                    <h5 class="modal-title">Bemanna <span id="modalUnitName"></span></h5>
+                    <h5 class="modal-title">Bemanna <span id="modalUnitName"></span> (<span id="modalPeriod"></span>)</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
