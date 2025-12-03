@@ -23,6 +23,17 @@
 
 <div class="container">
 
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
     <div class="card mb-4 shadow-sm">
         <div class="card-body">
             <form action="/my_view" method="GET" onchange="this.submit()">
@@ -73,9 +84,7 @@
                                     👷‍♂️ <strong>Kollega:</strong> {{ item.colleague }}
                                 </div>
                             {% else %}
-                                <div class="colleague-box text-danger">
-                                    ⚠️ Kollega saknas
-                                </div>
+                                <div class="colleague-box text-danger">⚠️ Kollega saknas</div>
                             {% endif %}
 
                             {% if item.comment %}
@@ -85,13 +94,11 @@
                     </div>
                     {% endfor %}
                 {% else %}
-                    <div class="text-center text-muted mt-5">
-                        <p>Du har inga inbokade pass framöver.</p>
-                    </div>
+                    <div class="text-center text-muted mt-5"><p>Du har inga inbokade pass framöver.</p></div>
                 {% endif %}
             </div>
 
-           <div class="tab-pane fade" id="pills-profile">
+            <div class="tab-pane fade" id="pills-profile">
                 <div class="alert alert-info small">
                     Här visas lediga pass 60 dagar framåt som matchar din roll (<strong>{{ current_user.role }}</strong>).
                 </div>
@@ -122,16 +129,14 @@
                     </div>
                     {% endfor %}
                 {% else %}
-                    <div class="text-center text-muted mt-5">
-                        <p>Just nu finns inga lediga pass för din roll.</p>
-                    </div>
+                    <div class="text-center text-muted mt-5"><p>Just nu finns inga lediga pass för din roll.</p></div>
                 {% endif %}
             </div>
 
-    {% else %}
-        <div class="text-center mt-5 text-muted">
-            <p>Välj ditt namn i listan ovan för att se ditt schema.</p>
         </div>
+
+    {% else %}
+        <div class="text-center mt-5 text-muted"><p>Välj ditt namn i listan ovan.</p></div>
     {% endif %}
 
 </div>
