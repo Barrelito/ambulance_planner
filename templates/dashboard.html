@@ -167,7 +167,7 @@
             
             <div class="mb-3">
                 <a href="/scheduler" class="btn btn-warning w-100 fw-bold shadow-sm py-2 text-uppercase">
-                    📅 Gå till Schemaläggaren (Massbokning)
+                    📅 Gå till Schemaläggaren
                 </a>
             </div>
 
@@ -182,18 +182,35 @@
                             <div class="col-12"><label class="form-label small fw-bold text-muted">Namn</label><input type="text" name="name" class="form-control" placeholder="För- och efternamn" required></div>
                             <div class="col-6"><label class="form-label small fw-bold text-muted">Hemstation</label><select name="home_station" class="form-select"><option value="Pool">Pool (Ingen fast)</option>{% for station in stations %}<option value="{{ station.name }}">{{ station.name }}</option>{% endfor %}</select></div>
                             <div class="col-6"><label class="form-label small fw-bold text-muted">Roll</label><select name="role" class="form-select"><option value="AMB">AMB</option><option value="VUB">VUB</option></select></div>
-                            <div class="col-12 mt-2"><div class="form-check"><input class="form-check-input" type="checkbox" name="has_sits" id="sitsCheck"><label class="form-check-label" for="sitsCheck">Har SITS-kompetens</label></div></div>
-                            <div class="col-12 mt-1"><div class="form-check"><input class="form-check-input" type="checkbox" name="has_c1" id="c1Check" checked><label class="form-check-label" for="c1Check">Har C1-körkort</label></div></div>
+                            <div class="col-12 mt-2">
+                                <div class="form-check"><input class="form-check-input" type="checkbox" name="has_sits" id="sitsCheck"><label class="form-check-label" for="sitsCheck">Har SITS-kompetens</label></div>
+                                <div class="form-check"><input class="form-check-input" type="checkbox" name="has_c1" id="c1Check" checked><label class="form-check-label" for="c1Check">Har C1-körkort</label></div>
+                            </div>
                             <div class="col-12 mt-3"><button type="submit" class="btn btn-success w-100">Lägg till i listan</button></div>
                         </div>
                     </form>
+                    
                     <h6 class="text-muted small fw-bold">Befintlig Personal</h6>
                     <div style="max-height: 400px; overflow-y: auto;">
                         <table class="table table-sm table-hover" style="font-size: 0.9em;">
-                            <thead class="table-light sticky-top"><tr><th>Namn</th><th>Roll</th><th>Station</th><th>SITS</th><th></th></tr></thead>
+                            <thead class="table-light sticky-top">
+                                <tr>
+                                    <th>Namn</th>
+                                    <th>Roll</th>
+                                    <th>Stn</th>
+                                    <th>SITS</th>
+                                    <th>C1</th> <th></th>
+                                </tr>
+                            </thead>
                             <tbody>
                                 {% for user in users %}
-                                <tr><td>{{ user.name }}</td><td>{{ user.role }}</td><td>{{ user.home_station }}</td><td>{% if user.has_sits %}✅{% endif %}</td><td class="text-end"><a href="/admin/delete_user/{{ user.id }}" class="text-danger text-decoration-none" onclick="return confirm('Radera {{ user.name }}?')">🗑️</a></td></tr>
+                                <tr>
+                                    <td>{{ user.name }}</td>
+                                    <td>{{ user.role }}</td>
+                                    <td>{{ user.home_station }}</td>
+                                    <td>{% if user.has_sits %}✅{% endif %}</td>
+                                    <td>{% if user.has_c1 %}<span class="badge bg-primary" style="font-size: 0.7em;">C1</span>{% endif %}</td> <td class="text-end"><a href="/admin/delete_user/{{ user.id }}" class="text-danger text-decoration-none" onclick="return confirm('Radera {{ user.name }}?')">🗑️</a></td>
+                                </tr>
                                 {% endfor %}
                             </tbody>
                         </table>
