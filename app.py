@@ -462,12 +462,20 @@ def view_logs():
     if 'logged_in' not in session: return redirect(url_for('login'))
     logs = AuditLog.query.order_by(AuditLog.timestamp.desc()).limit(100).all()
     return render_template('logs.html', logs=logs)
+
 @app.route('/admin/add_user', methods=['POST'])
 def add_user():
-    db.session.add(User(name=request.form.get('name'), role=request.form.get('role'), home_station=request.form.get('home_station'), has_sits=bool(request.form.get('has_sits'))))
+    db.session.add(User(
+        name=request.form.get('name'), 
+        role=request.form.get('role'), 
+        home_station=request.form.get('home_station'), 
+        has_sits=bool(request.form.get('has_sits')),
+        has_c1=bool(request.form.get('has_c1')) # <--- NYTT
+    ))
     db.session.commit()
     add_log(f"Lade till personal: {request.form.get('name')}")
     return redirect(url_for('dashboard'))
+
 @app.route('/admin/delete_user/<int:user_id>')
 def delete_user(user_id): db.session.delete(User.query.get(user_id)); db.session.commit(); return redirect(url_for('dashboard'))
 @app.route('/admin/add_station', methods=['POST'])
@@ -476,12 +484,21 @@ def add_station():
     return redirect(url_for('admin'))
 @app.route('/admin/update_station', methods=['POST'])
 def update_station(): s = Station.query.get(request.form.get('station_id')); s.name = request.form.get('name') if s else None; db.session.commit(); return redirect(url_for('admin'))
+
 @app.route('/admin/update_unit', methods=['POST'])
 def update_unit():
     u = Unit.query.get(request.form.get('unit_id'))
     if u:
-        u.name=request.form.get('name'); u.day_time=request.form.get('day_time'); u.mid_time=request.form.get('mid_time'); u.night_time=request.form.get('night_time'); u.requires_sits=bool(request.form.get('requires_sits')); u.is_flex=bool(request.form.get('is_flex')); db.session.commit()
+        u.name=request.form.get('name')
+        u.day_time=request.form.get('day_time')
+        u.mid_time=request.form.get('mid_time')
+        u.night_time=request.form.get('night_time')
+        u.requires_sits=bool(request.form.get('requires_sits'))
+        u.is_flex=bool(request.form.get('is_flex'))
+        u.requires_c1=bool(request.form.get('requires_c1')) # <--- NYTT
+        db.session.commit()
     return redirect(url_for('admin'))
+
 @app.route('/admin/export_excel')
 def export_excel():
     data = [{'Datum': s.date, 'Station': s.unit.station.name, 'Enhet': s.unit.name, 'Period': s.period, 'Tid': s.unit.day_time if s.period=='Dag' else s.unit.night_time, 'AMB_Namn': s.amb.name if s.amb else '', 'VUB_Namn': s.vub.name if s.vub else ''} for s in Shift.query.all()]

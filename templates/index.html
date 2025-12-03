@@ -7,6 +7,7 @@
     <style>
         .unit-row { border-bottom: 1px solid #eee; padding: 10px 0; }
         .sits-badge { background-color: #ffc107; color: #000; font-weight: bold; font-size: 0.8em; padding: 2px 6px; border-radius: 4px; }
+        .c1-badge { background-color: #0d6efd; color: #fff; font-weight: bold; font-size: 0.8em; padding: 2px 6px; border-radius: 4px; margin-left:2px; }
         .shift-box { background-color: #f8f9fa; border: 1px dashed #ccc; padding: 8px; text-align: center; border-radius: 5px; cursor: pointer; transition: 0.2s; min-height: 50px; position: relative;}
         .shift-box:hover { background-color: #e2e6ea; border-color: #adb5bd; }
         .blankpass-box { background-color: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 10px; cursor: pointer; transition: 0.2s; text-align: center; height: 100%; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
@@ -99,16 +100,10 @@
                             <div class="col-md-3 col-6">
                                 <div class="blankpass-box {{ is_active }}"
                                      onclick="openModal(this)"
-                                     data-unit-id="{{ unit.id }}" 
-                                     data-unit-name="{{ unit.name }}" 
-                                     data-period="Dag"
-                                     data-amb="{{ amb_val }}"
-                                     data-vub="{{ vub_val }}"
-                                     data-comment="{{ comment }}"
-                                     data-requires-sits="False"
-                                     data-person-id="{{ person_id }}"
-                                     data-person-name="{{ person_name }}">
-                                    
+                                     data-unit-id="{{ unit.id }}" data-unit-name="{{ unit.name }}" data-period="Dag"
+                                     data-amb="{{ amb_val }}" data-vub="{{ vub_val }}" data-comment="{{ comment }}"
+                                     data-requires-sits="False" data-requires-c1="False"
+                                     data-person-id="{{ person_id }}" data-person-name="{{ person_name }}">
                                     {% if comment %} <span class="comment-icon" title="{{ comment }}">💬</span> {% endif %}
                                     <div class="fw-bold text-muted small mb-1">{{ unit.name }}</div>
                                     {% if shift and (shift.amb or shift.vub) %}
@@ -129,6 +124,7 @@
                         <div class="col-md-2">
                             <span class="fw-bold">{{ unit.name }}</span>
                             {% if unit.requires_sits %} <div class="sits-badge d-inline-block mt-1">SITS</div> {% endif %}
+                            {% if unit.requires_c1 %} <div class="c1-badge d-inline-block mt-1">C1</div> {% endif %}
                             {% if unit.is_flex %} <span class="badge bg-success">FLEX</span> {% endif %}
                         </div>
                         {% for p in ['Dag', 'Mellan', 'Natt'] %}
@@ -137,14 +133,16 @@
                                 {% set t_tid = unit.day_time if p == 'Dag' else (unit.night_time if p == 'Natt' else unit.mid_time) %}
                                 {% if t_tid %}
                                     {% set warning = false %}
-                                    {% if unit.requires_sits and shift and ((shift.amb and not shift.amb.has_sits) or (shift.vub and not shift.vub.has_sits)) %}
+                                    {% if unit.requires_sits and shift and ((shift.amb and not shift.amb.has_sits) or (shift.vub and not shift.vub.has_sits)) %} {% set warning = true %} {% endif %}
+                                    
+                                    {% if unit.requires_c1 and shift and shift.amb and not shift.amb.has_c1 %}
                                         {% set warning = true %}
                                     {% endif %}
+
                                     {% set amb_val = shift.amb_id if shift and shift.amb_id else '' %}
                                     {% set vub_val = shift.vub_id if shift and shift.vub_id else '' %}
                                     {% set comment = shift.comment if shift and shift.comment else '' %}
                                     {% set interests = interest_map.get(shift.id, '') if shift else '' %}
-                                    
                                     {% set is_full = shift.amb and shift.vub if shift else false %}
                                     {% set show_star = true if (interests and not is_full) else false %}
 
@@ -154,6 +152,7 @@
                                          data-amb="{{ amb_val }}" data-vub="{{ vub_val }}"
                                          data-comment="{{ comment }}"
                                          data-requires-sits="{{ unit.requires_sits }}"
+                                         data-requires-c1="{{ unit.requires_c1 }}"
                                          data-interests="{{ interests }}">
                                          
                                          {% if comment %} <span class="comment-icon" title="{{ comment }}">💬</span> {% endif %}
@@ -163,7 +162,7 @@
                                         {% if shift and (shift.amb or shift.vub) %}
                                             <div class="fw-bold text-primary">{{ shift.amb.name if shift.amb else '-' }}</div>
                                             <div class="fw-bold text-success">{{ shift.vub.name if shift.vub else '-' }}</div>
-                                            {% if warning %}<div class="text-dark fw-bold small mt-1">⚠️ SITS SAKNAS</div>{% endif %}
+                                            {% if warning %}<div class="text-dark fw-bold small mt-1">⚠️ KOMPETENS SAKNAS</div>{% endif %}
                                         {% else %} <small class="text-muted">Vakant</small> {% endif %}
                                     </div>
                                 {% else %}
@@ -182,16 +181,14 @@
     {% endfor %}
 </div>
 
-<div class="text-center py-4 border-top mt-5">
-    <a href="/logout" class="text-danger text-decoration-none small">Logga ut</a>
-</div>
+<div class="text-center py-4 border-top mt-5"><a href="/logout" class="text-danger text-decoration-none small">Logga ut</a></div>
 
 <div class="modal fade" id="editModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
             <form action="/update_shift" method="POST">
                 <div class="modal-header">
-                    <h5 class="modal-title">Bemanna <span id="modalUnitName"></span> (<span id="modalPeriod"></span>)</h5>
+                    <h5 class="modal-title">Bemanna <span id="modalUnitName"></span></h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
@@ -199,37 +196,42 @@
                     <input type="hidden" name="unit_id" id="inputUnitId">
                     <input type="hidden" name="period" id="inputPeriod">
                     <input type="hidden" id="unitRequiresSits">
+                    <input type="hidden" id="unitRequiresC1">
 
                     <div id="applicantSection" class="mb-3 d-none">
-                        <label class="form-label fw-bold text-dark">🌟 Intresseanmälningar (Gnet)</label>
+                        <label class="form-label fw-bold text-dark">🌟 Intresseanmälningar</label>
                         <div class="list-group mb-2" id="applicantList"></div>
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label fw-bold text-primary" id="labelAmb">AMB</label>
+                        <label class="form-label fw-bold text-primary" id="labelAmb">AMB (Kör)</label>
                         <select class="form-select" name="amb_id" id="selectAmb" onchange="checkWarnings()">
-                            <option value="" data-sits="False">-- Ingen vald --</option>
+                            <option value="" data-sits="False" data-c1="False" data-role="None">-- Ingen vald --</option>
                             {% for station_name, group in users|groupby('home_station') %}
                                 <optgroup label="{{ station_name }}">
                                     {% for user in group %}
                                         {% set busy = busy_users.get(user.id, {}) %}
                                         {% set is_bp = false %}
                                         {% set b_info = "" %}
-                                        {% set b_dag = busy.get('Dag', '') %}
-                                        {% set b_mid = busy.get('Mellan', '') %}
-                                        {% set b_natt = busy.get('Natt', '') %}
-                                        {% if 'Plats' in b_dag or 'Plats' in b_mid or 'Plats' in b_natt %}
-                                            {% set is_bp = true %}
-                                            {% set b_info = "(På: " ~ (b_dag or b_mid or b_natt) ~ ")" %}
+                                        {% if busy %}
+                                            {% set b_dag = busy.get('Dag', '') %}
+                                            {% set b_mid = busy.get('Mellan', '') %}
+                                            {% set b_natt = busy.get('Natt', '') %}
+                                            {% if 'Plats' in b_dag or 'Plats' in b_mid or 'Plats' in b_natt %}
+                                                {% set is_bp = true %}
+                                                {% set b_info = "(På: " ~ (b_dag or b_mid or b_natt) ~ ")" %}
+                                            {% endif %}
                                         {% endif %}
+                                        
                                         <option value="{{ user.id }}" 
                                                 data-sits="{{ user.has_sits }}" 
-                                                data-busy-dag="{{ b_dag }}" 
-                                                data-busy-mellan="{{ b_mid }}" 
-                                                data-busy-natt="{{ b_natt }}"
-                                                data-is-blankpass="{{ is_bp }}"
+                                                data-c1="{{ user.has_c1 }}" 
+                                                data-role="{{ user.role }}"
+                                                data-busy-dag="{{ busy.get('Dag', '') }}" 
+                                                data-busy-mellan="{{ busy.get('Mellan', '') }}" 
+                                                data-busy-natt="{{ busy.get('Natt', '') }}"
                                                 class="{{ 'text-primary fw-bold' if is_bp else '' }}">
-                                            {{ user.name }} {% if user.has_sits %}(SITS){% endif %} {{ b_info }}
+                                            {{ user.name }} ({{ user.role }}) {{ b_info }}
                                         </option>
                                     {% endfor %}
                                 </optgroup>
@@ -238,30 +240,33 @@
                     </div>
 
                     <div class="mb-3" id="vubContainer">
-                        <label class="form-label fw-bold text-success">VUB</label>
+                        <label class="form-label fw-bold text-success">VUB (Vårdar)</label>
                         <select class="form-select" name="vub_id" id="selectVub" onchange="checkWarnings()">
-                            <option value="" data-sits="False">-- Ingen vald --</option>
+                            <option value="" data-sits="False" data-c1="False" data-role="None">-- Ingen vald --</option>
                             {% for station_name, group in users|groupby('home_station') %}
                                 <optgroup label="{{ station_name }}">
                                     {% for user in group %}
                                         {% set busy = busy_users.get(user.id, {}) %}
                                         {% set is_bp = false %}
                                         {% set b_info = "" %}
-                                        {% set b_dag = busy.get('Dag', '') %}
-                                        {% set b_mid = busy.get('Mellan', '') %}
-                                        {% set b_natt = busy.get('Natt', '') %}
-                                        {% if 'Plats' in b_dag or 'Plats' in b_mid or 'Plats' in b_natt %}
-                                            {% set is_bp = true %}
-                                            {% set b_info = "(På: " ~ (b_dag or b_mid or b_natt) ~ ")" %}
+                                        {% if busy %}
+                                            {% set b_dag = busy.get('Dag', '') %}
+                                            {% set b_mid = busy.get('Mellan', '') %}
+                                            {% set b_natt = busy.get('Natt', '') %}
+                                            {% if 'Plats' in b_dag or 'Plats' in b_mid or 'Plats' in b_natt %}
+                                                {% set is_bp = true %}
+                                                {% set b_info = "(På: " ~ (b_dag or b_mid or b_natt) ~ ")" %}
+                                            {% endif %}
                                         {% endif %}
                                         <option value="{{ user.id }}" 
                                                 data-sits="{{ user.has_sits }}" 
-                                                data-busy-dag="{{ b_dag }}" 
-                                                data-busy-mellan="{{ b_mid }}" 
-                                                data-busy-natt="{{ b_natt }}"
-                                                data-is-blankpass="{{ is_bp }}"
+                                                data-c1="{{ user.has_c1 }}" 
+                                                data-role="{{ user.role }}"
+                                                data-busy-dag="{{ busy.get('Dag', '') }}" 
+                                                data-busy-mellan="{{ busy.get('Mellan', '') }}" 
+                                                data-busy-natt="{{ busy.get('Natt', '') }}"
                                                 class="{{ 'text-primary fw-bold' if is_bp else '' }}">
-                                            {{ user.name }} {% if user.has_sits %}(SITS){% endif %} {{ b_info }}
+                                            {{ user.name }} ({{ user.role }}) {{ b_info }}
                                         </option>
                                     {% endfor %}
                                 </optgroup>
@@ -270,17 +275,18 @@
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label fw-bold text-muted">💬 Kommentar</label>
-                        <textarea name="comment" id="inputComment" class="form-control" rows="2"></textarea>
+                        <textarea name="comment" id="inputComment" class="form-control" rows="2" placeholder="Kommentar..."></textarea>
                     </div>
 
-                    <div id="sitsWarning" class="alert alert-warning d-none mt-3">⚠️ <strong>SITS-VARNING:</strong> Denna bil kräver SITS.</div>
-                    <div id="doubleBookingWarning" class="alert alert-danger d-none mt-3">🛑 <strong>VARNING:</strong> <span id="doubleBookingText"></span></div>
-                    <div id="moveInfo" class="alert alert-success d-none mt-3">♻️ <strong>Flyttas:</strong> <span id="moveInfoText"></span> från resursplats.</div>
+                    <div id="c1Warning" class="alert alert-warning d-none mt-2">🛑 <strong>C1 SAKNAS:</strong> AMB måste ha C1-körkort på denna bil!</div>
+                    <div id="roleWarning" class="alert alert-info d-none mt-2">💡 <strong>OBS:</strong> Rollblandning (VUB på AMB-rad eller tvärtom).</div>
+                    <div id="sitsWarning" class="alert alert-warning d-none mt-2">⚠️ <strong>SITS:</strong> Bilen kräver SITS.</div>
+                    <div id="doubleBookingWarning" class="alert alert-danger d-none mt-2">🛑 <strong>KROCK:</strong> <span id="doubleBookingText"></span></div>
+                    <div id="moveInfo" class="alert alert-success d-none mt-2">♻️ <strong>Flyttas:</strong> <span id="moveInfoText"></span> från resursplats.</div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Avbryt</button>
-                    <button type="submit" class="btn btn-primary">Spara ändringar</button>
+                    <button type="submit" class="btn btn-primary">Spara</button>
                 </div>
             </form>
         </div>
@@ -288,30 +294,7 @@
 </div>
 
 <div class="modal fade" id="moveModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <form action="/move_staff" method="POST">
-                <div class="modal-header bg-success text-white">
-                    <h5 class="modal-title">♻️ Flytta Resurs</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <input type="hidden" name="date" value="{{ current_date }}">
-                    <input type="hidden" name="person_id" id="movePersonId">
-                    <h5 class="text-center mb-4">Vad vill du göra med <span id="movePersonName" class="fw-bold"></span>?</h5>
-                    <div class="card p-3 mb-3 border-success bg-light">
-                        <label class="form-label fw-bold text-success">Alternativ A: Flytta till vakant bil (Idag)</label>
-                        <select class="form-select form-select-lg mb-2" name="target_spot" id="moveTargetSpot"><option value="">-- Välj i listan --</option></select>
-                        <button type="submit" name="action" value="move" class="btn btn-success w-100">✅ Bekräfta Flytt</button>
-                    </div>
-                    <div class="card p-3 border-danger bg-light">
-                        <label class="form-label fw-bold text-danger">Alternativ B: Ta bort från schemat</label>
-                        <button type="submit" name="action" value="delete" class="btn btn-outline-danger w-100">❌ Ta bort från passet</button>
-                    </div>
-                </div>
-            </form>
-        </div>
-    </div>
+    <div class="modal-dialog"><div class="modal-content"><form action="/move_staff" method="POST"><div class="modal-header bg-success text-white"><h5 class="modal-title">♻️ Flytta Resurs</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><input type="hidden" name="date" value="{{ current_date }}"><input type="hidden" name="person_id" id="movePersonId"><h5 class="text-center mb-4">Vad vill du göra med <span id="movePersonName" class="fw-bold"></span>?</h5><div class="card p-3 mb-3 border-success bg-light"><label class="form-label fw-bold text-success">Alternativ A: Flytta till vakant bil (Idag)</label><select class="form-select form-select-lg mb-2" name="target_spot" id="moveTargetSpot"><option value="">-- Välj i listan --</option></select><button type="submit" name="action" value="move" class="btn btn-success w-100">✅ Bekräfta Flytt</button></div><div class="card p-3 border-danger bg-light"><label class="form-label fw-bold text-danger">Alternativ B: Ta bort från schemat</label><button type="submit" name="action" value="delete" class="btn btn-outline-danger w-100">❌ Ta bort från passet</button></div></div></form></div></div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
@@ -339,6 +322,7 @@
         var personId = element.getAttribute('data-person-id');
         var personName = element.getAttribute('data-person-name');
         var requiresSits = element.getAttribute('data-requires-sits');
+        var requiresC1 = element.getAttribute('data-requires-c1'); // NY
         var interestsRaw = element.getAttribute('data-interests');
 
         if (unitName.includes("Plats") && personId) {
@@ -355,6 +339,7 @@
         document.getElementById('inputUnitId').value = unitId;
         document.getElementById('inputPeriod').value = period;
         document.getElementById('unitRequiresSits').value = requiresSits;
+        document.getElementById('unitRequiresC1').value = requiresC1; // NY
         document.getElementById('selectAmb').value = ambId;
         document.getElementById('selectVub').value = vubId;
         document.getElementById('inputComment').value = comment;
@@ -386,26 +371,55 @@
             document.getElementById('labelAmb').innerText = "Resurs / Personal";
         } else {
             document.getElementById('vubContainer').style.display = 'block';
-            document.getElementById('labelAmb').innerText = "AMB";
+            document.getElementById('labelAmb').innerText = "AMB (Kör)";
         }
         checkWarnings(); editModal.show();
     }
 
-    function checkWarnings() { checkSits(); checkDoubleBooking(); }
+    function checkWarnings() {
+        if (document.getElementById('modalUnitName').innerText.includes("Plats")) {
+            // Dölj alla varningar om det är blankpass
+            document.getElementById('c1Warning').classList.add('d-none');
+            document.getElementById('sitsWarning').classList.add('d-none');
+            document.getElementById('roleWarning').classList.add('d-none');
+            return;
+        }
 
-    function checkSits() {
-        if (document.getElementById('modalUnitName').innerText.includes("Plats")) { document.getElementById('sitsWarning').classList.add('d-none'); return; }
         var requiresSits = document.getElementById('unitRequiresSits').value === 'True';
-        var warningBox = document.getElementById('sitsWarning');
-        if (!requiresSits) { warningBox.classList.add('d-none'); return; }
+        var requiresC1 = document.getElementById('unitRequiresC1').value === 'True';
+        
         var ambSelect = document.getElementById('selectAmb');
         var vubSelect = document.getElementById('selectVub');
         var ambOption = ambSelect.options[ambSelect.selectedIndex];
         var vubOption = vubSelect.options[vubSelect.selectedIndex];
-        var showWarning = false;
-        if (ambSelect.value !== "" && ambOption.getAttribute('data-sits') !== 'True') showWarning = true;
-        if (vubSelect.value !== "" && vubOption.getAttribute('data-sits') !== 'True') showWarning = true;
-        if (showWarning) warningBox.classList.remove('d-none'); else warningBox.classList.add('d-none');
+
+        // 1. C1 KONTROLL: AMB MÅSTE HA C1 OM BILEN KRÄVER DET
+        var showC1Warning = false;
+        if (requiresC1 && ambSelect.value !== "") {
+            var ambHasC1 = ambOption.getAttribute('data-c1') === 'True';
+            if (!ambHasC1) showC1Warning = true;
+        }
+        if (showC1Warning) document.getElementById('c1Warning').classList.remove('d-none');
+        else document.getElementById('c1Warning').classList.add('d-none');
+
+        // 2. ROLL KONTROLL (Varning om man blandar)
+        var showRoleWarning = false;
+        if (ambSelect.value !== "" && ambOption.getAttribute('data-role') === 'VUB') showRoleWarning = true;
+        if (vubSelect.value !== "" && vubOption.getAttribute('data-role') === 'AMB') showRoleWarning = true;
+        if (showRoleWarning) document.getElementById('roleWarning').classList.remove('d-none');
+        else document.getElementById('roleWarning').classList.add('d-none');
+
+        // 3. SITS KONTROLL
+        var showSitsWarning = false;
+        if (requiresSits) {
+            if (ambSelect.value !== "" && ambOption.getAttribute('data-sits') !== 'True') showSitsWarning = true;
+            if (vubSelect.value !== "" && vubOption.getAttribute('data-sits') !== 'True') showSitsWarning = true;
+        }
+        if (showSitsWarning) document.getElementById('sitsWarning').classList.remove('d-none'); 
+        else document.getElementById('sitsWarning').classList.add('d-none');
+
+        // 4. DUBBELBOKNING
+        checkDoubleBooking();
     }
 
     function checkDoubleBooking() {
