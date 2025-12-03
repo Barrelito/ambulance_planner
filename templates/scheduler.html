@@ -7,9 +7,11 @@
     <style>
         .day-select { font-size: 0.8em; padding: 2px; }
         .grid-row { display: flex; gap: 5px; margin-bottom: 5px; align-items: center; }
-        .grid-label { width: 80px; font-weight: bold; }
+        .grid-label { width: 80px; font-weight: bold; font-size: 0.9em; }
         .day-col { flex: 1; text-align: center; }
         .day-header { font-size: 0.7em; font-weight: bold; text-transform: uppercase; color: #666; }
+        /* Gör varannan vecka lite gråare för enklare läsning */
+        .grid-row:nth-child(even) { background-color: #f9f9f9; border-radius: 4px; }
     </style>
 </head>
 <body class="bg-light">
@@ -21,7 +23,7 @@
     </div>
 </nav>
 
-<div class="container">
+<div class="container pb-5">
     <div class="card shadow">
         <div class="card-body">
             
@@ -65,27 +67,41 @@
                         <input type="date" name="start_date" class="form-control" required>
                     </div>
                     <div class="col-md-4">
-                        <label class="form-label fw-bold">4. Begränsningsperiod (Antal veckor)</label>
-                        <input type="number" name="total_weeks" class="form-control" value="15" min="1" required>
-                        <div class="form-text">Hur länge ska schemat rulla? (T.ex. 15 veckor)</div>
+                        <label class="form-label fw-bold">4. Begränsningsperiod</label>
+                        <div class="input-group">
+                            <input type="number" id="totalWeeks" name="total_weeks" class="form-control" value="15" min="1" required>
+                            <span class="input-group-text">veckor</span>
+                        </div>
+                        <div class="form-text">Hur länge varar hela perioden?</div>
                     </div>
                 </div>
 
                 <hr>
 
-                <h5 class="mb-3">5. Bygg schemacykeln</h5>
-                <div class="row mb-3 align-items-center">
-                    <div class="col-auto">
-                        <label>Hur många veckor rullar schemat på?</label>
-                    </div>
-                    <div class="col-auto">
-                        <input type="number" id="cycleWeeks" name="cycle_weeks" class="form-control" value="5" min="1" max="10" style="width: 80px;" onchange="buildGrid()">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="m-0">5. Bygg schemat</h5>
+                    
+                    <div class="btn-group">
+                        <button type="button" class="btn btn-outline-primary btn-sm" onclick="setRolling()">🔄 Rullande (5v)</button>
+                        <button type="button" class="btn btn-outline-dark btn-sm" onclick="setWish()">📝 Önskeschema (Hela perioden)</button>
                     </div>
                 </div>
 
-                <div class="p-3 bg-white border rounded mb-4">
-                    <div class="grid-row">
-                        <div class="grid-label"></div>
+                <div class="row mb-3 align-items-center bg-light p-2 rounded border">
+                    <div class="col-auto">
+                        <label class="fw-bold">Antal veckor att fylla i:</label>
+                    </div>
+                    <div class="col-auto">
+                        <input type="number" id="cycleWeeks" name="cycle_weeks" class="form-control fw-bold text-center" value="5" min="1" max="52" style="width: 80px;" onchange="buildGrid()">
+                    </div>
+                    <div class="col-auto">
+                        <span class="text-muted small" id="cycleHelpText">Systemet repeterar dessa 5 veckor tills perioden är slut.</span>
+                    </div>
+                </div>
+
+                <div class="p-3 border rounded mb-4" style="background-color: #fff;">
+                    <div class="grid-row border-bottom pb-2">
+                        <div class="grid-label">Vecka</div>
                         <div class="day-col day-header">Mån</div>
                         <div class="day-col day-header">Tis</div>
                         <div class="day-col day-header">Ons</div>
@@ -97,11 +113,7 @@
                     <div id="gridContainer"></div>
                 </div>
 
-                <div class="alert alert-info">
-                    ℹ️ <strong>Tips:</strong> Systemet repeterar cykeln tills perioden är slut. Om du väljer en ny bil uppdateras tiderna automatiskt ovan.
-                </div>
-
-                <button type="submit" class="btn btn-success w-100 py-3 fw-bold text-uppercase">Generera Schema 🚀</button>
+                <button type="submit" class="btn btn-success w-100 py-3 fw-bold text-uppercase shadow-sm">Generera Schema 🚀</button>
 
             </form>
         </div>
@@ -109,6 +121,22 @@
 </div>
 
 <script>
+    // Funktioner för knapparna
+    function setRolling() {
+        document.getElementById('cycleWeeks').value = 5;
+        document.getElementById('cycleHelpText').innerText = "Systemet repeterar dessa 5 veckor tills perioden är slut.";
+        buildGrid();
+    }
+
+    function setWish() {
+        // Hämta totala antalet veckor
+        var total = document.getElementById('totalWeeks').value;
+        // Sätt cykeln till samma sak
+        document.getElementById('cycleWeeks').value = total;
+        document.getElementById('cycleHelpText').innerText = "Du fyller i hela perioden manuellt (inget repeteras).";
+        buildGrid();
+    }
+
     function buildGrid() {
         const weeks = document.getElementById('cycleWeeks').value;
         const container = document.getElementById('gridContainer');
@@ -173,7 +201,10 @@
             container.appendChild(row);
         }
     }
+    
+    // Kör vid start
     buildGrid();
 </script>
+
 </body>
 </html>
