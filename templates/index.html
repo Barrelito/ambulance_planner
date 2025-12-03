@@ -39,7 +39,8 @@
         <div class="d-flex justify-content-between align-items-center mb-3">
             <h2 class="m-0 fw-bold">🚑 VO NORD <span class="text-primary ms-2">{{ current_date }}</span></h2>
             <div class="d-flex gap-2">
-                <a href="/my_view" class="btn btn-info btn-sm text-white">📱 Min Sida</a> <a href="/dashboard" class="btn btn-primary btn-sm">📊 Samordnare</a>
+                <a href="/my_view" class="btn btn-info btn-sm text-white">📱 Min Sida</a>
+                <a href="/dashboard" class="btn btn-primary btn-sm">📊 Samordnare</a>
                 <a href="/admin" class="btn btn-secondary btn-sm">🔧 Teknisk Admin</a>
             </div>
         </div>
@@ -142,8 +143,10 @@
                                     {% set amb_val = shift.amb_id if shift and shift.amb_id else '' %}
                                     {% set vub_val = shift.vub_id if shift and shift.vub_id else '' %}
                                     {% set comment = shift.comment if shift and shift.comment else '' %}
-                                    
                                     {% set interests = interest_map.get(shift.id, '') if shift else '' %}
+                                    
+                                    {% set is_full = shift.amb and shift.vub if shift else false %}
+                                    {% set show_star = true if (interests and not is_full) else false %}
 
                                     <div class="shift-box {{ 'shift-warning' if warning else '' }}" 
                                          onclick="openModal(this)"
@@ -151,8 +154,12 @@
                                          data-amb="{{ amb_val }}" data-vub="{{ vub_val }}"
                                          data-comment="{{ comment }}"
                                          data-requires-sits="{{ unit.requires_sits }}"
-                                         data-interests="{{ interests }}"> {% if comment %} <span class="comment-icon" title="{{ comment }}">💬</span> {% endif %}
-                                         {% if interests %} <span class="interest-icon">🌟</span> {% endif %} <span class="time-label">{{ t_tid }}</span>
+                                         data-interests="{{ interests }}">
+                                         
+                                         {% if comment %} <span class="comment-icon" title="{{ comment }}">💬</span> {% endif %}
+                                         {% if show_star %} <span class="interest-icon">🌟</span> {% endif %}
+
+                                         <span class="time-label">{{ t_tid }}</span>
                                         {% if shift and (shift.amb or shift.vub) %}
                                             <div class="fw-bold text-primary">{{ shift.amb.name if shift.amb else '-' }}</div>
                                             <div class="fw-bold text-success">{{ shift.vub.name if shift.vub else '-' }}</div>
@@ -195,8 +202,7 @@
 
                     <div id="applicantSection" class="mb-3 d-none">
                         <label class="form-label fw-bold text-dark">🌟 Intresseanmälningar (Gnet)</label>
-                        <div class="list-group mb-2" id="applicantList">
-                            </div>
+                        <div class="list-group mb-2" id="applicantList"></div>
                     </div>
 
                     <div class="mb-3">
@@ -216,7 +222,13 @@
                                             {% set is_bp = true %}
                                             {% set b_info = "(På: " ~ (b_dag or b_mid or b_natt) ~ ")" %}
                                         {% endif %}
-                                        <option value="{{ user.id }}" data-sits="{{ user.has_sits }}" data-busy-dag="{{ b_dag }}" data-busy-mellan="{{ b_mid }}" data-busy-natt="{{ b_natt }}" data-is-blankpass="{{ is_bp }}" class="{{ 'text-primary fw-bold' if is_bp else '' }}">
+                                        <option value="{{ user.id }}" 
+                                                data-sits="{{ user.has_sits }}" 
+                                                data-busy-dag="{{ b_dag }}" 
+                                                data-busy-mellan="{{ b_mid }}" 
+                                                data-busy-natt="{{ b_natt }}"
+                                                data-is-blankpass="{{ is_bp }}"
+                                                class="{{ 'text-primary fw-bold' if is_bp else '' }}">
                                             {{ user.name }} {% if user.has_sits %}(SITS){% endif %} {{ b_info }}
                                         </option>
                                     {% endfor %}
@@ -242,7 +254,13 @@
                                             {% set is_bp = true %}
                                             {% set b_info = "(På: " ~ (b_dag or b_mid or b_natt) ~ ")" %}
                                         {% endif %}
-                                        <option value="{{ user.id }}" data-sits="{{ user.has_sits }}" data-busy-dag="{{ b_dag }}" data-busy-mellan="{{ b_mid }}" data-busy-natt="{{ b_natt }}" data-is-blankpass="{{ is_bp }}" class="{{ 'text-primary fw-bold' if is_bp else '' }}">
+                                        <option value="{{ user.id }}" 
+                                                data-sits="{{ user.has_sits }}" 
+                                                data-busy-dag="{{ b_dag }}" 
+                                                data-busy-mellan="{{ b_mid }}" 
+                                                data-busy-natt="{{ b_natt }}"
+                                                data-is-blankpass="{{ is_bp }}"
+                                                class="{{ 'text-primary fw-bold' if is_bp else '' }}">
                                             {{ user.name }} {% if user.has_sits %}(SITS){% endif %} {{ b_info }}
                                         </option>
                                     {% endfor %}
@@ -257,8 +275,8 @@
                     </div>
 
                     <div id="sitsWarning" class="alert alert-warning d-none mt-3">⚠️ <strong>SITS-VARNING:</strong> Denna bil kräver SITS.</div>
-                    <div id="doubleBookingWarning" class="alert alert-danger d-none mt-3">🛑 <strong>KROCK:</strong> <span id="doubleBookingText"></span></div>
-                    <div id="moveInfo" class="alert alert-success d-none mt-3">♻️ <strong>Flyttas:</strong> <span id="moveInfoText"></span> från sin resursplats.</div>
+                    <div id="doubleBookingWarning" class="alert alert-danger d-none mt-3">🛑 <strong>VARNING:</strong> <span id="doubleBookingText"></span></div>
+                    <div id="moveInfo" class="alert alert-success d-none mt-3">♻️ <strong>Flyttas:</strong> <span id="moveInfoText"></span> från resursplats.</div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Avbryt</button>
@@ -321,8 +339,6 @@
         var personId = element.getAttribute('data-person-id');
         var personName = element.getAttribute('data-person-name');
         var requiresSits = element.getAttribute('data-requires-sits');
-        
-        // NYTT: Hämta intresseanmälningar
         var interestsRaw = element.getAttribute('data-interests');
 
         if (unitName.includes("Plats") && personId) {
@@ -343,41 +359,27 @@
         document.getElementById('selectVub').value = vubId;
         document.getElementById('inputComment').value = comment;
 
-        // HANTERA INTRESSELISTAN
         var appList = document.getElementById('applicantList');
         var appSection = document.getElementById('applicantSection');
-        appList.innerHTML = ''; // Rensa gamla
-
+        appList.innerHTML = '';
         if (interestsRaw && interestsRaw.length > 0) {
             appSection.classList.remove('d-none');
             var applicants = interestsRaw.split('|');
             applicants.forEach(function(app) {
-                // app = "ID:Namn:Roll"
                 var parts = app.split(':');
-                var uId = parts[0];
-                var uName = parts[1];
-                var uRole = parts[2];
-
+                var uId = parts[0]; var uName = parts[1]; var uRole = parts[2];
                 var btn = document.createElement('button');
                 btn.type = 'button';
                 btn.className = 'list-group-item list-group-item-action d-flex justify-content-between align-items-center';
                 btn.innerHTML = `<span><strong>${uName}</strong> (${uRole})</span> <span class="badge bg-success rounded-pill">Välj</span>`;
-                
-                // När man klickar på personen, fyll i rätt dropdown
                 btn.onclick = function() {
-                    if (uRole === 'SSK' || uRole === 'AMB') {
-                        document.getElementById('selectAmb').value = uId;
-                    } else {
-                        document.getElementById('selectVub').value = uId;
-                    }
-                    checkWarnings(); // Uppdatera varningar
+                    if (uRole === 'AMB' || uRole === 'SSK') { document.getElementById('selectAmb').value = uId; }
+                    else { document.getElementById('selectVub').value = uId; }
+                    checkWarnings();
                 };
-                
                 appList.appendChild(btn);
             });
-        } else {
-            appSection.classList.add('d-none');
-        }
+        } else { appSection.classList.add('d-none'); }
 
         if (unitName.includes("Plats")) {
             document.getElementById('vubContainer').style.display = 'none';
