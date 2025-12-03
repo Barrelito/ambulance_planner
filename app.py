@@ -14,19 +14,17 @@ SYSTEM_PASSWORD = "ambulans112"
 
 db.init_app(app)
 
-# Importera modeller (se till att models.py ligger i samma mapp)
+# Importera modeller
 from models import *
 
 # --- HJÄLPFUNKTIONER ---
 def add_log(text):
-    """Lägger till en händelse i loggboken."""
     log_entry = AuditLog(action=text)
     db.session.add(log_entry)
 
-# --- SÄKERHET & INLOGGNING ---
+# --- SÄKERHET ---
 @app.before_request
 def require_login():
-    """Kräver inloggning på alla sidor utom login och statiska filer."""
     allowed_routes = ['login', 'static']
     if request.endpoint not in allowed_routes and 'logged_in' not in session:
         return redirect(url_for('login'))
@@ -47,12 +45,15 @@ def logout():
     return redirect(url_for('login'))
 
 # --- HUVUDSIDAN (PLANERING) ---
-# --- UPPDATERAD INDEX-FUNKTION (HÄMTA INTRESSEN) ---
 @app.route('/')
 def index():
     selected_date_str = request.args.get('date') or date.today().strftime('%Y-%m-%d')
-    try: selected_date = datetime.strptime(selected_date_str, '%Y-%m-%d').date()
-    except: selected_date = date.today(); selected_date_str = selected_date.strftime('%Y-%m-%d')
+    try:
+        selected_date = datetime.strptime(selected_date_str, '%Y-%m-%d').date()
+    except:
+        selected_date = date.today()
+        selected_date_str = selected_date.strftime('%Y-%m-%d')
+
     prev_date = (selected_date - timedelta(days=1)).strftime('%Y-%m-%d')
     next_date = (selected_date + timedelta(days=1)).strftime('%Y-%m-%d')
 
@@ -62,13 +63,11 @@ def index():
 
     shift_map = {}
     busy_users = {}
-    
-    # NYTT: Karta för intresseanmälningar
-    # Format: interest_map[shift_id] = "Id:Namn:Roll, Id:Namn:Roll"
-    interest_map = {} 
+    interest_map = {}
 
     for shift in shifts:
-        if shift.unit_id not in shift_map: shift_map[shift.unit_id] = {}
+        if shift.unit_id not in shift_map:
+            shift_map[shift.unit_id] = {}
         shift_map[shift.unit_id][shift.period] = shift
 
         if shift.amb_id:
@@ -77,27 +76,30 @@ def index():
         if shift.vub_id:
             if shift.vub_id not in busy_users: busy_users[shift.vub_id] = {}
             busy_users[shift.vub_id][shift.period] = shift.unit.name
-            
-        # Hämta intresseanmälningar för detta pass
+        
+        # Hämta intressen
         interests = Interest.query.filter_by(shift_id=shift.id).all()
         if interests:
-            # Bygg en sträng som vi kan skicka till HTML: "12:Sven:VUB, 45:Anna:AMB"
             applicants = []
             for i in interests:
                 applicants.append(f"{i.user.id}:{i.user.name}:{i.user.role}")
             interest_map[shift.id] = "|".join(applicants)
-
-    # (Vakanslistan för flytt-modalen - oförändrad)
+    
+    # Hitta vakanser för IDAG
     vacant_spots = []
     all_units = Unit.query.all()
     for unit in all_units:
-        if 'BLANKPASS' in unit.station.name: continue
+        if 'BLANKPASS' in unit.station.name:
+            continue
+        
         s_dag = shift_map.get(unit.id, {}).get('Dag')
         if not s_dag or not s_dag.amb_id or not s_dag.vub_id:
             vacant_spots.append({'id': unit.id, 'name': unit.name, 'period': 'Dag', 'station': unit.station.name})
+        
         s_natt = shift_map.get(unit.id, {}).get('Natt')
         if not s_natt or not s_natt.amb_id or not s_natt.vub_id:
             vacant_spots.append({'id': unit.id, 'name': unit.name, 'period': 'Natt', 'station': unit.station.name})
+            
         if unit.mid_time:
             s_mid = shift_map.get(unit.id, {}).get('Mellan')
             if not s_mid or not s_mid.amb_id or not s_mid.vub_id:
@@ -105,10 +107,10 @@ def index():
 
     return render_template('index.html', 
                            stations=all_stations, shift_map=shift_map, users=all_users, busy_users=busy_users, 
-                           interest_map=interest_map, # <-- SKICKA MED DENNA
+                           interest_map=interest_map,
                            current_date=selected_date_str, prev_date=prev_date, next_date=next_date, vacant_spots=vacant_spots)
 
-# --- SPARA/UPPDATERA PASS ---
+# --- SPARA PASS ---
 @app.route('/update_shift', methods=['POST'])
 def update_shift():
     target_date = request.form.get('date') 
@@ -122,7 +124,6 @@ def update_shift():
     unit = Unit.query.get(unit_id)
     station_anchor = f"station-{unit.station.id}" if unit else ""
 
-    # Rensa om personen kom från ett blankpass
     def clear_from_blankpass(user_id):
         if not user_id: return
         user_shifts = Shift.query.filter_by(date=target_date, period=period).all()
@@ -143,7 +144,6 @@ def update_shift():
         shift = Shift(date=target_date, unit_id=unit_id, period=period)
         db.session.add(shift)
 
-    # Logga ändringar
     log_messages = []
     if shift.amb_id != new_amb_id: log_messages.append("Ändrade AMB")
     if shift.vub_id != new_vub_id: log_messages.append("Ändrade VUB")
@@ -159,7 +159,7 @@ def update_shift():
     db.session.commit()
     return redirect(url_for('index', date=target_date, _anchor=station_anchor))
 
-# --- FLYTTA PERSONAL FRÅN BLANKPASS ---
+# --- FLYTTA PERSONAL ---
 @app.route('/move_staff', methods=['POST'])
 def move_staff():
     date_str = request.form.get('date')
@@ -169,7 +169,6 @@ def move_staff():
     person = User.query.get(person_id)
     person_name = person.name if person else "Okänd"
 
-    # Rensa gamla platsen
     old_shifts = Shift.query.filter_by(date=date_str).all()
     station_anchor = ""
     old_unit_name = ""
@@ -178,13 +177,14 @@ def move_staff():
         if s.amb_id == person_id: 
             s.amb_id = None
             old_unit_name = s.unit.name
-            if 'BLANKPASS' in s.unit.station.name: station_anchor = f"station-{s.unit.station.id}"
+            if 'BLANKPASS' in s.unit.station.name:
+                station_anchor = f"station-{s.unit.station.id}"
         if s.vub_id == person_id: 
             s.vub_id = None
             old_unit_name = s.unit.name
-            if 'BLANKPASS' in s.unit.station.name: station_anchor = f"station-{s.unit.station.id}"
+            if 'BLANKPASS' in s.unit.station.name:
+                station_anchor = f"station-{s.unit.station.id}"
 
-    # Alternativ A: Flytta
     if action == 'move':
         target_value = request.form.get('target_spot')
         if target_value:
@@ -204,10 +204,9 @@ def move_staff():
             
             add_log(f"{date_str}: Flyttade {person_name} från {old_unit_name} till {target_unit.name}")
 
-    # Alternativ B: Ta bort
     if action == 'delete':
         add_log(f"{date_str}: Tog bort {person_name} från {old_unit_name}")
-        flash("Personen har tagits bort från passet.", "info")
+        flash("Personen har tagits bort.", "info")
 
     db.session.commit()
     return redirect(url_for('index', date=date_str, _anchor=station_anchor))
@@ -243,7 +242,6 @@ def generate_schedule():
         current_date_str = (start_date + timedelta(days=i)).strftime('%Y-%m-%d')
         shift_type = pattern[i % len(pattern)]
         
-        # Rensa dubbletter
         existing = Shift.query.filter_by(date=current_date_str).all()
         for s in existing:
             if s.amb_id == user_id: s.amb_id = None
@@ -260,12 +258,12 @@ def generate_schedule():
         elif not target_shift.vub_id: target_shift.vub_id = user_id
         else: target_shift.vub_id = user_id
     
-    add_log(f"Schemaläggaren: Genererade schema för {user.name} på {unit.name}")
+    add_log(f"Schemaläggaren: {user.name} på {unit.name}")
     db.session.commit()
-    flash(f"Schema genererat för {total_weeks} veckor!", "success")
+    flash(f"Schema genererat!", "success")
     return redirect(url_for('dashboard'))
 
-# --- MIN VY & GNETA (UPPDATERAD) ---
+# --- MIN VY & GNETA ---
 @app.route('/my_view', methods=['GET'])
 def my_view():
     all_users = User.query.order_by(User.name).all()
@@ -277,12 +275,12 @@ def my_view():
     if user_id:
         current_user = User.query.get(user_id)
         today = date.today()
-        end_date = today + timedelta(days=60) # 60 dagar framåt
+        end_date = today + timedelta(days=60)
         
         today_str = today.strftime('%Y-%m-%d')
         end_str = end_date.strftime('%Y-%m-%d')
 
-        # 1. HÄMTA MINA PASS
+        # 1. Hämta mina pass
         shifts = Shift.query.filter(
             ((Shift.amb_id == user_id) | (Shift.vub_id == user_id)),
             Shift.date >= today_str
@@ -295,15 +293,15 @@ def my_view():
             tid = s.unit.day_time if s.period == 'Dag' else (s.unit.night_time if s.period == 'Natt' else s.unit.mid_time)
             my_shifts.append({'date': s.date, 'period': s.period, 'station': s.unit.station.name, 'unit': s.unit.name, 'time': tid, 'colleague': colleague_name, 'comment': s.comment})
 
-        # 2. HÄMTA LEDIGA PASS (GNETA)
+        # 2. Hämta lediga pass (GNETA)
         # Hämta befintliga pass
         existing_shifts = Shift.query.filter(Shift.date >= today_str, Shift.date <= end_str).all()
         shift_map = {}
         for s in existing_shifts:
             shift_map[(s.date, s.unit_id, s.period)] = s
         
+        # Hämta intressen
         my_interests = [i.shift_id for i in Interest.query.filter_by(user_id=user_id).all()]
-        # Skapa nycklar för att matcha intressen även mot pass som inte finns än
         interest_keys = []
         raw_interests = Interest.query.filter_by(user_id=user_id).all()
         for i in raw_interests:
@@ -326,10 +324,10 @@ def my_view():
                     is_vacant = False
                     
                     if not shift:
-                        # Passet saknas i DB = Ledigt
+                        # Passet finns inte = Vakant
                         is_vacant = True
                     else:
-                        # Passet finns, kolla om MIN roll saknas
+                        # Kolla om min roll är ledig
                         if current_user.role == 'AMB' and shift.amb_id is None: is_vacant = True
                         if current_user.role == 'VUB' and shift.vub_id is None: is_vacant = True
                     
@@ -377,7 +375,18 @@ def apply_interest():
         
     return redirect(url_for('my_view', user_id=user_id))
 
-# --- UPPDATERAD DASHBOARD (RÄKNA INTRESSEN) ---
+# --- ADMIN ROUTER ---
+@app.route('/admin')
+def admin():
+    stations = Station.query.all()
+    return render_template('admin.html', stations=stations)
+
+@app.route('/admin/logs')
+def view_logs():
+    if 'logged_in' not in session: return redirect(url_for('login'))
+    logs = AuditLog.query.order_by(AuditLog.timestamp.desc()).limit(100).all()
+    return render_template('logs.html', logs=logs)
+
 @app.route('/dashboard')
 def dashboard():
     users = User.query.order_by(User.home_station, User.name).all()
@@ -404,8 +413,7 @@ def dashboard():
     existing_shifts = Shift.query.filter(Shift.date >= start_str, Shift.date <= end_str).all()
     shift_map = {}
     
-    # Spara även antalet intressen i kartan
-    # structure: shift_map[(date, unit, period)] = {shift_obj, interest_count}
+    # Spara intresse-antal
     for s in existing_shifts:
         count = Interest.query.filter_by(shift_id=s.id).count()
         shift_map[(s.date, s.unit_id, s.period)] = {'obj': s, 'interest_count': count}
@@ -428,7 +436,6 @@ def dashboard():
             for p in periods:
                 total_potential_shifts += 1
                 data = shift_map.get((d_str, unit.id, p))
-                
                 shift = data['obj'] if data else None
                 interest_count = data['interest_count'] if data else 0
                 
@@ -437,6 +444,7 @@ def dashboard():
                 else:
                     if not shift.amb_id: missing.append("AMB")
                     if not shift.vub_id: missing.append("VUB")
+                
                 if missing:
                     tid = unit.day_time if p == 'Dag' else (unit.night_time if p == 'Natt' else unit.mid_time)
                     vacancies.append({
@@ -446,42 +454,32 @@ def dashboard():
                         'period': p, 
                         'time': tid, 
                         'missing': ", ".join(missing),
-                        'applicants': interest_count # <-- NYTT: Antal sökande
+                        'applicants': interest_count
                     })
                 else: filled_shifts += 1
     
     fill_rate = int((filled_shifts / total_potential_shifts * 100)) if total_potential_shifts > 0 else 0
     vacancies = sorted(vacancies, key=lambda x: (x['date'], x['station']))
     
-    return render_template('dashboard.html', users=users, stations=stations, vacancies=vacancies, fill_rate=fill_rate, vacancy_count=len(vacancies), sel_year=sel_year, sel_month=sel_month, sel_week=sel_week, sel_station_id=sel_station_id, filter_label=filter_label)
-
-@app.route('/admin')
-def admin(): return render_template('admin.html', stations=Station.query.all())
-@app.route('/admin/logs')
-def view_logs():
-    if 'logged_in' not in session: return redirect(url_for('login'))
-    logs = AuditLog.query.order_by(AuditLog.timestamp.desc()).limit(100).all()
-    return render_template('logs.html', logs=logs)
+    return render_template('dashboard.html', users=users, stations=stations, vacancies=vacancies, fill_rate=fill_rate, vacancy_count=len(vacancies), 
+                           sel_year=sel_year, sel_month=sel_month, sel_week=sel_week, sel_station_id=sel_station_id, filter_label=filter_label)
 
 @app.route('/admin/add_user', methods=['POST'])
 def add_user():
-    db.session.add(User(
-        name=request.form.get('name'), 
-        role=request.form.get('role'), 
-        home_station=request.form.get('home_station'), 
-        has_sits=bool(request.form.get('has_sits')),
-        has_c1=bool(request.form.get('has_c1')) # <--- NYTT
-    ))
+    db.session.add(User(name=request.form.get('name'), role=request.form.get('role'), home_station=request.form.get('home_station'), has_sits=bool(request.form.get('has_sits')), has_c1=bool(request.form.get('has_c1'))))
     db.session.commit()
     add_log(f"Lade till personal: {request.form.get('name')}")
     return redirect(url_for('dashboard'))
 
 @app.route('/admin/delete_user/<int:user_id>')
-def delete_user(user_id): db.session.delete(User.query.get(user_id)); db.session.commit(); return redirect(url_for('dashboard'))
+def delete_user(user_id):
+    db.session.delete(User.query.get(user_id)); db.session.commit(); return redirect(url_for('dashboard'))
+
 @app.route('/admin/add_station', methods=['POST'])
 def add_station(): 
     if not Station.query.filter_by(name=request.form.get('name')).first(): db.session.add(Station(name=request.form.get('name'))); db.session.commit()
     return redirect(url_for('admin'))
+
 @app.route('/admin/update_station', methods=['POST'])
 def update_station(): s = Station.query.get(request.form.get('station_id')); s.name = request.form.get('name') if s else None; db.session.commit(); return redirect(url_for('admin'))
 
@@ -489,13 +487,8 @@ def update_station(): s = Station.query.get(request.form.get('station_id')); s.n
 def update_unit():
     u = Unit.query.get(request.form.get('unit_id'))
     if u:
-        u.name=request.form.get('name')
-        u.day_time=request.form.get('day_time')
-        u.mid_time=request.form.get('mid_time')
-        u.night_time=request.form.get('night_time')
-        u.requires_sits=bool(request.form.get('requires_sits'))
-        u.is_flex=bool(request.form.get('is_flex'))
-        u.requires_c1=bool(request.form.get('requires_c1')) # <--- NYTT
+        u.name=request.form.get('name'); u.day_time=request.form.get('day_time'); u.mid_time=request.form.get('mid_time'); u.night_time=request.form.get('night_time')
+        u.requires_sits=bool(request.form.get('requires_sits')); u.is_flex=bool(request.form.get('is_flex')); u.requires_c1=bool(request.form.get('requires_c1'))
         db.session.commit()
     return redirect(url_for('admin'))
 
@@ -504,6 +497,7 @@ def export_excel():
     data = [{'Datum': s.date, 'Station': s.unit.station.name, 'Enhet': s.unit.name, 'Period': s.period, 'Tid': s.unit.day_time if s.period=='Dag' else s.unit.night_time, 'AMB_Namn': s.amb.name if s.amb else '', 'VUB_Namn': s.vub.name if s.vub else ''} for s in Shift.query.all()]
     output = BytesIO(); pd.DataFrame(data).to_excel(output, index=False); output.seek(0)
     return send_file(output, download_name=f"Backup_{date.today()}.xlsx", as_attachment=True)
+
 @app.route('/admin/import_excel', methods=['POST'])
 def import_excel():
     try:
@@ -517,6 +511,7 @@ def import_excel():
         db.session.commit(); add_log("Importerade data från Excel")
     except: pass
     return redirect(url_for('admin'))
+
 @app.route('/admin/generate_template', methods=['POST'])
 def generate_template():
     y, m = int(request.form.get('year')), int(request.form.get('month')); data = []
