@@ -41,10 +41,17 @@
                 <a href="/admin" class="btn btn-secondary btn-sm">🔧 Teknisk Admin</a>
             </div>
         </div>
+        
         <form action="/" method="GET" class="d-flex justify-content-between align-items-center bg-light p-2 rounded border">
-            <a href="/?date={{ prev_date }}" class="btn btn-outline-dark fw-bold">‹ Föregående dag</a>
-            <input type="date" name="date" class="form-control w-auto" value="{{ current_date }}" onchange="this.form.submit()">
-            <a href="/?date={{ next_date }}" class="btn btn-outline-dark fw-bold">Nästa dag ›</a>
+            <a href="/" class="btn btn-success fw-bold me-3">📅 IDAG</a>
+
+            <div class="d-flex align-items-center flex-grow-1 justify-content-center">
+                <a href="/?date={{ prev_date }}" class="btn btn-outline-dark fw-bold">‹ Föregående dag</a>
+                <input type="date" name="date" class="form-control w-auto mx-2" value="{{ current_date }}" onchange="this.form.submit()">
+                <a href="/?date={{ next_date }}" class="btn btn-outline-dark fw-bold">Nästa dag ›</a>
+            </div>
+            
+            <div style="width: 80px;"></div>
         </form>
     </div>
 </div>
@@ -161,6 +168,10 @@
     {% endfor %}
 </div>
 
+<div class="text-center py-4 border-top mt-5">
+    <a href="/logout" class="text-danger text-decoration-none small">Logga ut (Lås systemet)</a>
+</div>
+
 <div class="modal fade" id="editModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -274,30 +285,16 @@
     var editModal = new bootstrap.Modal(document.getElementById('editModal'));
     var moveModal = new bootstrap.Modal(document.getElementById('moveModal'));
 
-    // --- LOGIK FÖR ATT KOMMA IHÅG ÖPPNA/STÄNGDA STATIONER ---
     document.addEventListener("DOMContentLoaded", function() {
         var collapses = document.querySelectorAll('.station-collapse');
-        
         collapses.forEach(function(el) {
-            // Hämta status från LocalStorage
             var storedState = localStorage.getItem(el.id);
-            
-            // Om den är markerad som 'closed', ta bort 'show' klassen
-            if (storedState === 'closed') {
-                el.classList.remove('show');
-            }
-            
-            // Lyssna på ändringar
-            el.addEventListener('hidden.bs.collapse', function () {
-                localStorage.setItem(el.id, 'closed');
-            });
-            el.addEventListener('shown.bs.collapse', function () {
-                localStorage.setItem(el.id, 'open');
-            });
+            if (storedState === 'closed') { el.classList.remove('show'); }
+            el.addEventListener('hidden.bs.collapse', function () { localStorage.setItem(el.id, 'closed'); });
+            el.addEventListener('shown.bs.collapse', function () { localStorage.setItem(el.id, 'open'); });
         });
     });
 
-    // --- ÖVRIG LOGIK (MODAL ETC) ---
     function openModal(element) {
         var unitId = element.getAttribute('data-unit-id');
         var unitName = element.getAttribute('data-unit-name');
@@ -314,8 +311,7 @@
             var sourceSelect = document.getElementById('vacanciesData');
             var targetSelect = document.getElementById('moveTargetSpot');
             targetSelect.innerHTML = sourceSelect.innerHTML;
-            moveModal.show();
-            return; 
+            moveModal.show(); return; 
         }
 
         document.getElementById('modalUnitName').innerText = unitName;
@@ -323,7 +319,6 @@
         document.getElementById('inputUnitId').value = unitId;
         document.getElementById('inputPeriod').value = period;
         document.getElementById('unitRequiresSits').value = requiresSits;
-        
         document.getElementById('selectAmb').value = ambId;
         document.getElementById('selectVub').value = vubId;
 
@@ -334,26 +329,20 @@
             document.getElementById('vubContainer').style.display = 'block';
             document.getElementById('labelAmb').innerText = "AMB";
         }
-
-        checkWarnings();
-        editModal.show();
+        checkWarnings(); editModal.show();
     }
 
     function checkWarnings() { checkSits(); checkDoubleBooking(); }
 
     function checkSits() {
-        if (document.getElementById('modalUnitName').innerText.includes("Plats")) {
-            document.getElementById('sitsWarning').classList.add('d-none'); return;
-        }
+        if (document.getElementById('modalUnitName').innerText.includes("Plats")) { document.getElementById('sitsWarning').classList.add('d-none'); return; }
         var requiresSits = document.getElementById('unitRequiresSits').value === 'True';
         var warningBox = document.getElementById('sitsWarning');
         if (!requiresSits) { warningBox.classList.add('d-none'); return; }
-        
         var ambSelect = document.getElementById('selectAmb');
         var vubSelect = document.getElementById('selectVub');
         var ambOption = ambSelect.options[ambSelect.selectedIndex];
         var vubOption = vubSelect.options[vubSelect.selectedIndex];
-        
         var showWarning = false;
         if (ambSelect.value !== "" && ambOption.getAttribute('data-sits') !== 'True') showWarning = true;
         if (vubSelect.value !== "" && vubOption.getAttribute('data-sits') !== 'True') showWarning = true;
@@ -371,8 +360,7 @@
         var vubSelect = document.getElementById('selectVub');
         var ambOption = ambSelect.options[ambSelect.selectedIndex];
         var vubOption = vubSelect.options[vubSelect.selectedIndex];
-        var conflicts = [];
-        var moves = [];
+        var conflicts = []; var moves = [];
 
         function checkOption(option) {
             if (option.value !== "") {
@@ -384,7 +372,6 @@
             }
         }
         checkOption(ambOption); checkOption(vubOption);
-
         if (conflicts.length > 0) { warningText.innerText = conflicts.join(', '); warningBox.classList.remove('d-none'); } else warningBox.classList.add('d-none');
         if (moves.length > 0) { moveText.innerText = moves.join(', '); moveBox.classList.remove('d-none'); } else moveBox.classList.add('d-none');
     }
